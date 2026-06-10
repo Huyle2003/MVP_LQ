@@ -110,6 +110,8 @@ class EditorCountedImageLayer(BaseModel):
     x: int = Field(0, ge=0)
     y: int = Field(0, ge=0)
     width: int = Field(90, ge=10, le=1000)
+    border_size: int = Field(2, ge=0, le=30)
+    border_color: str = Field("#ffffff")
     opacity: float = Field(1.0, ge=0.1, le=1.0)
     z_index: int = Field(20, ge=0)
     text: EditorCountedImageText = Field(default_factory=EditorCountedImageText)

@@ -54,7 +54,7 @@ class SkinButtonService:
             name=btn.name,
             code=btn.code,
             image_object_name=btn.image_object_name,
-            image_url=self.storage.presigned_url(btn.image_object_name),
+            image_url=self.storage.preview_url(btn.image_object_name),
             status=btn.status,
             sort_order=btn.sort_order,
             created_at=btn.created_at,

@@ -50,7 +50,7 @@ class CountedImageService:
             name=item.name,
             code=item.code,
             image_object_name=item.image_object_name,
-            image_url=self.storage.presigned_url(item.image_object_name),
+            image_url=self.storage.preview_url(item.image_object_name),
             default_quantity=item.default_quantity,
             status=item.status,
             sort_order=item.sort_order,

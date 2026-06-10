@@ -64,12 +64,14 @@ class SkinCropService:
     async def auto_detect_and_crop(
         self,
         file: UploadFile,
-        min_card_width: Optional[int] = None,
-        min_card_height: Optional[int] = None,
-        max_card_width: Optional[int] = None,
-        max_card_height: Optional[int] = None,
+        card_width: int = 325,
+        card_height: int = 515,
+        gap_x: int = 25,
+        row_count: int = 1,
+        count_per_row: int = 5,
+        start_x: int = 702,
     ) -> AutoDetectResponse:
-        """Auto-detect skin cards using OpenCV contour detection, then crop & upload."""
+        """Auto-detect skin cards using AI to find Y, with fixed card dimensions and X."""
         _content_type_guard(file.content_type)
 
         content = await file.read()
@@ -79,14 +81,16 @@ class SkinCropService:
                 detail="File ảnh quá lớn, tối đa 20MB",
             )
 
-        # Detect cards
+        # Detect cards using AI with fixed card dimensions
         try:
             boxes, orig_w, orig_h = detect_skin_cards(
                 content,
-                min_card_width=min_card_width,
-                min_card_height=min_card_height,
-                max_card_width=max_card_width,
-                max_card_height=max_card_height,
+                card_width=card_width,
+                card_height=card_height,
+                gap_x=gap_x,
+                row_count=row_count,
+                count_per_row=count_per_row,
+                start_x=start_x,
             )
         except ValueError as exc:
             raise HTTPException(
@@ -127,7 +131,7 @@ class SkinCropService:
                 object_name=object_name,
                 content_type="image/png",
             )
-            image_url = self.storage.presigned_url(object_name)
+            image_url = self.storage.preview_url(object_name)
             items.append(
                 AutoDetectItem(
                     index=i + 1,
@@ -190,7 +194,7 @@ class SkinCropService:
                     object_name=object_name,
                     content_type="image/png",
                 )
-                image_url = self.storage.presigned_url(object_name)
+                image_url = self.storage.preview_url(object_name)
                 items.append(
                     CropItemResponse(index=idx, object_name=object_name, image_url=image_url)
                 )
@@ -207,10 +211,10 @@ class SkinCropService:
         self.storage.delete_object(object_name)
 
     def _skin_to_response(self, skin: HeroSkin) -> HeroSkinResponse:
-        image_url = self.storage.presigned_url(skin.image_object_name)
+        image_url = self.storage.preview_url(skin.image_object_name)
         preview_url = None
         if skin.preview_object_name:
-            preview_url = self.storage.presigned_url(skin.preview_object_name)
+            preview_url = self.storage.preview_url(skin.preview_object_name)
         return HeroSkinResponse(
             id=skin.id,
             hero_id=skin.hero_id,

@@ -1,26 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Crop, ImagePlus, Loader2, Scissors, ScanSearch } from 'lucide-react'
 
 import { autoDetectCrop, manualCrop, deleteCroppedSkin } from '../services/skinCropService.js'
-import CropConfigPanel from '../components/skin-crop/CropConfigPanel.jsx'
+import CropConfigPanel, { DEFAULT_AUTO, DEFAULT_MANUAL } from '../components/skin-crop/CropConfigPanel.jsx'
 import CroppedSkinGrid from '../components/skin-crop/CroppedSkinGrid.jsx'
 import CreateSkinFromCropModal from '../components/skin-crop/CreateSkinFromCropModal.jsx'
-
-const DEFAULT_MANUAL = {
-  start_x: 480,
-  start_y: 175,
-  card_width: 230,
-  card_height: 415,
-  gap_x: 12,
-  row_count: 1,
-  count_per_row: 5,
-}
 
 export default function SkinCropPage() {
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState('')
   const [mode, setMode] = useState('auto')
   const [manualConfig, setManualConfig] = useState({ ...DEFAULT_MANUAL })
+  const [autoConfig, setAutoConfig] = useState({ ...DEFAULT_AUTO })
 
   const [croppedItems, setCroppedItems] = useState([])
   const [selectedCropped, setSelectedCropped] = useState(null)
@@ -29,6 +20,13 @@ export default function SkinCropPage() {
   const [message, setMessage] = useState('')
   const [imgNatural, setImgNatural] = useState({ w: 0, h: 0 })
   const [detectInfo, setDetectInfo] = useState(null)
+  const [resizeTick, setResizeTick] = useState(0)
+
+  useEffect(() => {
+    function onResize() { setResizeTick(t => t + 1) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   // Create skin modal
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -74,6 +72,12 @@ export default function SkinCropPage() {
 
       const formData = new FormData()
       formData.append('image', imageFile)
+      formData.append('card_width', String(autoConfig.card_width))
+      formData.append('card_height', String(autoConfig.card_height))
+      formData.append('gap_x', String(autoConfig.gap_x))
+      formData.append('row_count', String(autoConfig.row_count))
+      formData.append('count_per_row', String(autoConfig.count_per_row))
+      formData.append('start_x', String(autoConfig.start_x))
 
       const result = await autoDetectCrop(formData)
       setCroppedItems(result.items)
@@ -222,7 +226,47 @@ export default function SkinCropPage() {
                   src={originalPreview}
                   alt="Original"
                   onLoad={handleImageLoaded}
+                  id="crop-source-img"
                 />
+                {mode === 'manual' && imgNatural.w > 0 && (
+                  <canvas
+                    key={JSON.stringify(manualConfig) + imgNatural.w + imgNatural.h + resizeTick}
+                    id="crop-grid-overlay"
+                    className="crop-overlay-canvas"
+                    ref={canvasRef => {
+                      if (!canvasRef || !imgNatural.w) return
+                      const img = document.getElementById('crop-source-img')
+                      if (!img) { setTimeout(() => canvasRef.getContext('2d'), 50); return }
+                      const rect = img.getBoundingClientRect()
+                      canvasRef.width = rect.width
+                      canvasRef.height = rect.height
+                      const ctx = canvasRef.getContext('2d')
+                      const sx = rect.width / imgNatural.w
+                      const sy = rect.height / imgNatural.h
+                      ctx.clearRect(0, 0, canvasRef.width, canvasRef.height)
+                      ctx.strokeStyle = 'rgba(37, 99, 235, 0.8)'
+                      ctx.lineWidth = 2
+                      ctx.fillStyle = 'rgba(37, 99, 235, 0.12)'
+                      const cfg = manualConfig
+                      for (let row = 0; row < cfg.row_count; row++) {
+                        for (let col = 0; col < cfg.count_per_row; col++) {
+                          const x = (cfg.start_x + col * (cfg.card_width + cfg.gap_x)) * sx
+                          const y = (cfg.start_y + row * (cfg.card_height + cfg.gap_x)) * sy
+                          const w = cfg.card_width * sx
+                          const h = cfg.card_height * sy
+                          ctx.fillRect(x, y, w, h)
+                          ctx.strokeRect(x, y, w, h)
+                          if (col === 0) {
+                            ctx.fillStyle = '#fff'
+                            ctx.font = 'bold 14px sans-serif'
+                            ctx.fillText(`R${row + 1}`, x + 4, y + 16)
+                            ctx.fillStyle = 'rgba(37, 99, 235, 0.12)'
+                          }
+                        }
+                      }
+                    }}
+                  />
+                )}
               </div>
             ) : (
               <div className="empty-preview">Chưa chọn ảnh</div>
@@ -235,6 +279,8 @@ export default function SkinCropPage() {
             onModeChange={setMode}
             manualConfig={manualConfig}
             onManualChange={setManualConfig}
+            autoConfig={autoConfig}
+            onAutoChange={setAutoConfig}
             imageSize={imgNatural}
           />
         </div>

@@ -50,7 +50,7 @@ class OtherImageService:
             name=item.name,
             code=item.code,
             image_object_name=item.image_object_name,
-            image_url=self.storage.presigned_url(item.image_object_name),
+            image_url=self.storage.preview_url(item.image_object_name),
             status=item.status,
             sort_order=item.sort_order,
             created_at=item.created_at,

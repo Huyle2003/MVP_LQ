@@ -1,8 +1,8 @@
-"""OpenCV-based skin card detection.
+"""AI-powered skin card detection with fixed card dimensions and fixed X.
 
-Detects skin card regions in a shop screenshot by finding rectangular
-contours with aspect ratios typical of skin cards, then applying
-Non-Maximum Suppression to eliminate duplicates.
+Given known card size (width, height), gap, row count, cards per row,
+and a fixed start X, the detector uses edge-density scoring to find the
+optimal starting Y position in the image, then returns the full grid.
 """
 
 from dataclasses import dataclass
@@ -20,56 +20,100 @@ class CardBox:
     height: int
 
 
-# ─── Default thresholds ──────────────────────────────────
-MIN_SKIN_WIDTH_RATIO = 0.06      # card width must be >= 6% of image width
-MAX_SKIN_WIDTH_RATIO = 0.20      # card width must be <= 20% of image width
-MIN_SKIN_HEIGHT_RATIO = 0.20     # card height must be >= 20% of image height
-MAX_SKIN_HEIGHT_RATIO = 0.60     # card height must be <= 60% of image height
-MIN_ASPECT_RATIO = 1.3           # h/w minimum
-MAX_ASPECT_RATIO = 2.8           # h/w maximum
-NMS_IOU_THRESHOLD = 0.3          # IoU threshold for NMS
-SKIP_LEFT_RATIO = 0.15           # skip boxes with x < 15% of image width
-SKIP_TOP_RATIO = 0.08            # skip boxes with y < 8% of image height
-RESIZE_MAX_DIM = 1200             # resize to max 1200px for processing
+# ─── Search thresholds ──────────────────────────────────
+SKIP_TOP_RATIO = 0.02           # skip topmost 2% of image height
+EDGE_THRESHOLD = 30             # Canny lower threshold
+EDGE_THRESHOLD_MAX = 120        # Canny upper threshold
+RESIZE_MAX_DIM = 1600           # resize to max 1600px for processing
+TOP_BORDER_HEIGHT = 4           # height of the top border region to check
+SOBEL_KERNEL = 3
 
 
-def _nms(boxes: list[CardBox], iou_threshold: float) -> list[CardBox]:
-    """Non-Maximum Suppression – remove overlapping boxes."""
-    if not boxes:
-        return []
+def _score_y_position(
+    gray: np.ndarray,
+    sobel_y: np.ndarray,
+    y: int,
+    sx: int,
+    scw: int,
+    sch: int,
+    sgap: int,
+    count: int,
+) -> float:
+    """Score a Y position using multi-signal analysis.
 
-    # Convert to array of [x, y, x2, y2]
-    rects = np.array([[b.x, b.y, b.x + b.width, b.y + b.height] for b in boxes], dtype=np.float32)
-    scores = np.array([b.width * b.height for b in boxes], dtype=np.float32)
+    Combines three signals:
+    1. Top border strength — horizontal edge at the card's top edge (Sobel Y)
+    2. Card texture — standard deviation inside each card (detailed art = high std)
+    3. Gap cleanness — low edge response in gap regions between cards
+    """
+    h, w = gray.shape[:2]
 
-    indices = cv2.dnn.NMSBoxes(
-        bboxes=rects.tolist(),
-        scores=scores.tolist(),
-        score_threshold=0.0,
-        nms_threshold=iou_threshold,
-    )
+    border_score = 0.0
+    texture_score = 0.0
+    gap_penalty = 0.0
+    valid_cards = 0
+    valid_gaps = 0
 
-    if isinstance(indices, tuple):
-        indices = indices[0]
-    if isinstance(indices, np.ndarray):
-        indices = indices.flatten()
+    for i in range(count):
+        cx = sx + i * (scw + sgap)
+        if cx + scw > w or y + sch > h:
+            continue
+        valid_cards += 1
 
-    return [boxes[int(i)] for i in indices]
+        # ── 1. Top border strength ──────────────────────────
+        # The top border of a card is a strong horizontal edge (line)
+        top_strip = sobel_y[y:y + TOP_BORDER_HEIGHT, cx:cx + scw]
+        if top_strip.size > 0:
+            border_score += float(np.mean(top_strip))
+
+        # ── 2. Card interior texture ────────────────────────
+        # Card artwork has high variance (std) in pixel intensity
+        card_region = gray[y:y + sch, cx:cx + scw]
+        if card_region.size > 0:
+            texture_score += float(np.std(card_region))
+
+        # ── 3. Gap cleanness (between this card and next) ───
+        if i < count - 1:
+            gx = cx + scw
+            if gx + sgap <= w and y + sch <= h:
+                gap_region = gray[y:y + sch, gx:gx + sgap]
+                gap_edges = sobel_y[y:y + sch, gx:gx + sgap]
+                if gap_region.size > 0:
+                    # Gap should be uniform (low std) and have few edges
+                    gap_std = float(np.std(gap_region))
+                    gap_edge_mean = float(np.mean(gap_edges))
+                    # Penalize gaps with high edge or high texture
+                    gap_penalty += gap_edge_mean + gap_std * 0.3
+                    valid_gaps += 1
+
+    if valid_cards == 0:
+        return -999.0
+
+    avg_border = border_score / valid_cards
+    avg_texture = texture_score / valid_cards
+    avg_gap_penalty = gap_penalty / valid_gaps if valid_gaps > 0 else 0.0
+
+    # Combined score: strong border + rich texture - messy gaps
+    return avg_border * 2.0 + avg_texture * 0.8 - avg_gap_penalty * 1.5
 
 
 def detect_skin_cards(
     image_bytes: bytes,
-    min_card_width: int | None = None,
-    min_card_height: int | None = None,
-    max_card_width: int | None = None,
-    max_card_height: int | None = None,
+    card_width: int = 325,
+    card_height: int = 515,
+    gap_x: int = 25,
+    row_count: int = 1,
+    count_per_row: int = 5,
+    start_x: int = 702,
 ) -> tuple[list[CardBox], int, int]:
-    """Detect skin card bounding boxes in a shop screenshot.
+    """Detect skin cards using fixed X and AI-scored Y.
 
-    Uses edge detection + contour finding + aspect-ratio filtering.
+    With known card dimensions and fixed start_x, slides a window
+    vertically to find the Y position with the strongest edge response
+    across the full card row width.
 
     Returns (boxes, original_width, original_height).
-    If no cards found, returns empty list.
+    Always returns exactly count_per_row boxes when possible.
     """
     # ── Decode ──────────────────────────────────────────
     img_array = np.frombuffer(image_bytes, np.uint8)
@@ -89,67 +133,61 @@ def detect_skin_cards(
     else:
         new_w, new_h = orig_w, orig_h
 
-    # ── Grayscale + blur ────────────────────────────────
+    # Scale dimensions to resized image
+    scw = int(card_width * scale)
+    sch = int(card_height * scale)
+    sgap = int(gap_x * scale)
+    sx = int(start_x * scale)
+
+    # ── Grayscale + Sobel Y-gradient ────────────────────
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    sobel_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=SOBEL_KERNEL)
+    sobel_y = np.abs(sobel_y)
 
-    # ── Edge detection ──────────────────────────────────
-    edges = cv2.Canny(blurred, 30, 100)
-
-    # ── Morphology to close card borders ────────────────
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
-    closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
-    dilated = cv2.dilate(closed, kernel, iterations=1)
-
-    # ── Find contours ───────────────────────────────────
-    contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    # ── Compute thresholds based on resized image size ──
     h, w = img.shape[:2]
 
-    min_w_abs = min_card_width or int(w * MIN_SKIN_WIDTH_RATIO)
-    max_w_abs = max_card_width or int(w * MAX_SKIN_WIDTH_RATIO)
-    min_h_abs = min_card_height or int(h * MIN_SKIN_HEIGHT_RATIO)
-    max_h_abs = max_card_height or int(h * MAX_SKIN_HEIGHT_RATIO)
-    skip_left = int(w * SKIP_LEFT_RATIO)
-    skip_top = int(h * SKIP_TOP_RATIO)
+    # Total row span in pixels
+    total_row_width = count_per_row * scw + (count_per_row - 1) * sgap
+    row_end_x = min(sx + total_row_width, w)
 
-    candidates: list[CardBox] = []
+    # ── Search Y only (two-pass) ───────────────────────
+    search_start_y = int(h * SKIP_TOP_RATIO)
+    search_end_y = h - sch
 
-    for cnt in contours:
-        x, y, cw, ch = cv2.boundingRect(cnt)
+    # Pass 1: coarse search (step=2) for approximate Y
+    best_score = -9999.0
+    best_y = search_start_y
 
-        # Skip menu area (left side)
-        if x < skip_left:
-            continue
-        # Skip top bar
-        if y < skip_top:
-            continue
-        # Size filters
-        if cw < min_w_abs or cw > max_w_abs:
-            continue
-        if ch < min_h_abs or ch > max_h_abs:
-            continue
-        # Must be portrait orientation
-        if ch <= cw:
-            continue
-        # Aspect ratio filter
-        ratio = ch / cw
-        if ratio < MIN_ASPECT_RATIO or ratio > MAX_ASPECT_RATIO:
-            continue
+    for y in range(search_start_y, search_end_y, 2):
+        score = _score_y_position(gray, sobel_y, y, sx, scw, sch, sgap, count_per_row)
+        if score > best_score:
+            best_score = score
+            best_y = y
 
-        # Map back to original coordinates
-        orig_x = int(x / scale)
-        orig_y = int(y / scale)
-        orig_cw = int(cw / scale)
-        orig_ch = int(ch / scale)
+    # Pass 2: fine search (±6px around best_y, step=1)
+    fine_start = max(search_start_y, best_y - 6)
+    fine_end = min(search_end_y, best_y + 6)
+    for y in range(fine_start, fine_end, 1):
+        score = _score_y_position(gray, sobel_y, y, sx, scw, sch, sgap, count_per_row)
+        if score > best_score:
+            best_score = score
+            best_y = y
 
-        candidates.append(CardBox(orig_x, orig_y, orig_cw, orig_ch))
+    # ── Generate grid in ORIGINAL coordinates ──────────
+    # Use exact math, NOT scaled coords, to avoid rounding errors
 
-    # ── NMS ─────────────────────────────────────────────
-    boxes = _nms(candidates, NMS_IOU_THRESHOLD)
+    # Fine-tune Y: shift down by 2px to compensate for glow/shadow
+    # above the card that shifts the Sobel edge response upward
+    best_y = min(best_y + 2, h - sch)
 
-    # Sort by y then x (row-major order)
-    boxes.sort(key=lambda b: (b.y, b.x))
+    best_y_orig = round(best_y / scale)
+
+    boxes: list[CardBox] = []
+    for row in range(row_count):
+        for col in range(count_per_row):
+            cx = start_x + col * (card_width + gap_x)
+            cy = best_y_orig + row * (card_height + gap_x)
+            if cx + card_width <= orig_w and cy + card_height <= orig_h:
+                boxes.append(CardBox(cx, cy, card_width, card_height))
 
     return boxes, orig_w, orig_h

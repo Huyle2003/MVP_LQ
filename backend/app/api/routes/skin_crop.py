@@ -22,20 +22,24 @@ router = APIRouter(prefix="/api/skin-crop", tags=["Skin Crop"])
 @router.post("/auto-detect", response_model=AutoDetectResponse)
 async def auto_detect_and_crop(
     image: UploadFile = File(...),
-    min_card_width: Optional[int] = Form(None),
-    min_card_height: Optional[int] = Form(None),
-    max_card_width: Optional[int] = Form(None),
-    max_card_height: Optional[int] = Form(None),
+    card_width: int = Form(325),
+    card_height: int = Form(515),
+    gap_x: int = Form(25),
+    row_count: int = Form(1),
+    count_per_row: int = Form(5),
+    start_x: int = Form(702),
     current_user: dict = Depends(get_current_user),
 ):
-    """Auto-detect skin cards using OpenCV and crop them."""
+    """Auto-detect skin cards: fixed X, AI finds Y, with known card dimensions."""
     service = SkinCropService()
     return await service.auto_detect_and_crop(
         file=image,
-        min_card_width=min_card_width,
-        min_card_height=min_card_height,
-        max_card_width=max_card_width,
-        max_card_height=max_card_height,
+        card_width=card_width,
+        card_height=card_height,
+        gap_x=gap_x,
+        row_count=row_count,
+        count_per_row=count_per_row,
+        start_x=start_x,
     )
 
 

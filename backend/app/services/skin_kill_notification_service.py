@@ -54,7 +54,7 @@ class SkinKillNotificationService:
             name=ntf.name,
             code=ntf.code,
             image_object_name=ntf.image_object_name,
-            image_url=self.storage.presigned_url(ntf.image_object_name),
+            image_url=self.storage.preview_url(ntf.image_object_name),
             status=ntf.status,
             sort_order=ntf.sort_order,
             created_at=ntf.created_at,

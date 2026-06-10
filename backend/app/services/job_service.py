@@ -94,7 +94,7 @@ class JobService:
 
         data = json.loads(raw)
         result_object = data.get("result_object")
-        result_url = self.storage.presigned_url(result_object) if result_object else None
+        result_url = self.storage.preview_url(result_object) if result_object else None
 
         return JobResponse(
             job_id=job_id,

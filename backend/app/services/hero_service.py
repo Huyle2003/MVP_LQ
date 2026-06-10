@@ -21,7 +21,7 @@ class HeroService:
         skin_count = self.repo.count_skins(hero.id)
         avatar_url = None
         if hero.avatar_object_name:
-            avatar_url = self.storage.presigned_url(hero.avatar_object_name)
+            avatar_url = self.storage.preview_url(hero.avatar_object_name)
         return HeroResponse(
             id=hero.id,
             name=hero.name,

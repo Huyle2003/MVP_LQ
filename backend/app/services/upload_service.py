@@ -16,5 +16,5 @@ class UploadService:
         )
         return UploadResponse(
             object_name=object_name,
-            file_url=self.storage.presigned_url(object_name),
+            file_url=self.storage.preview_url(object_name),
         )

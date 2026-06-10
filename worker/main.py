@@ -221,6 +221,8 @@ def process_skin_board_editor_v2(job: dict, storage: StorageRepository) -> bytes
             x=ci.get("x", 0),
             y=ci.get("y", 0),
             width=ci.get("width", 90),
+            border_size=ci.get("border_size", 2),
+            border_color=ci.get("border_color", "#ffffff"),
             opacity=ci.get("opacity", 1.0),
             z_index=ci.get("z_index", 20),
             text=EditorCountedImageTextData(

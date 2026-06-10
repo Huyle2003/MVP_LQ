@@ -44,10 +44,10 @@ class HeroSkinService:
         self.storage = storage or StorageRepository()
 
     def _skin_to_response(self, skin: HeroSkin) -> HeroSkinResponse:
-        image_url = self.storage.presigned_url(skin.image_object_name)
+        image_url = self.storage.preview_url(skin.image_object_name)
         preview_url = None
         if skin.preview_object_name:
-            preview_url = self.storage.presigned_url(skin.preview_object_name)
+            preview_url = self.storage.preview_url(skin.preview_object_name)
         return HeroSkinResponse(
             id=skin.id,
             hero_id=skin.hero_id,

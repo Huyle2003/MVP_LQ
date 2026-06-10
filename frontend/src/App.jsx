@@ -88,7 +88,7 @@ export default function App() {
       case 'counted-images':
         return <CountedImagesPage />
       default:
-        return <DashboardPage user={user} />
+        return <DashboardPage user={user} onMenuChange={setActiveMenu} />
     }
   }
 

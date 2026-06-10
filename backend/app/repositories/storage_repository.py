@@ -132,9 +132,22 @@ class StorageRepository:
             raise RuntimeError(f"Cannot copy {source_object} -> {target_object}: {exc}") from exc
 
     def presigned_url(self, object_name: str) -> str:
+        """Legacy: generate presigned URL with host replacement.
+
+        Kept for backward compatibility but should be replaced by preview_url().
+        """
         url = self.client.presigned_get_object(
             bucket_name=self.bucket,
             object_name=object_name,
             expires=timedelta(hours=1),
         )
         return self._replace_host(url)
+
+    def preview_url(self, object_name: str) -> str:
+        """Generate a relative API URL for image preview via backend.
+
+        Returns: /api/files/preview?object_name=<encoded_object_name>
+        This works everywhere (localhost, Cloudflare Tunnel, VPS, custom domain).
+        """
+        from urllib.parse import quote
+        return f"/api/files/preview?object_name={quote(object_name)}"

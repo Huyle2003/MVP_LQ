@@ -14,6 +14,7 @@ from app.api.routes.skin_buttons import router as skin_buttons_router
 from app.api.routes.skin_kill_notifications import router as skin_kill_notifications_router
 from app.api.routes.other_images import router as other_images_router
 from app.api.routes.counted_images import router as counted_images_router
+from app.api.routes.files import router as files_router
 from app.core.config import get_settings
 from app.db.database import init_db
 
@@ -53,3 +54,4 @@ app.include_router(skin_buttons_router)
 app.include_router(skin_kill_notifications_router)
 app.include_router(other_images_router)
 app.include_router(counted_images_router)
+app.include_router(files_router)

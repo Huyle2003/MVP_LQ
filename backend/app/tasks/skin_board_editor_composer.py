@@ -79,6 +79,8 @@ class EditorCountedImageLayerData:
     x: int = 0
     y: int = 0
     width: int = 90
+    border_size: int = 2
+    border_color: str = "#ffffff"
     opacity: float = 1.0
     z_index: int = 20
     text: EditorCountedImageTextData = None
@@ -241,6 +243,9 @@ def compose_skin_board_editor_v2(
         ratio = ci.width / img.width
         new_h = int(img.height * ratio)
         img = img.resize((ci.width, new_h), Image.LANCZOS)
+        # Add border around image
+        if ci.border_size > 0:
+            img = _add_border(img, ci.border_size, 4, ci.border_color)
         img = _apply_opacity(img, ci.opacity)
         # Draw quantity text
         txt = ci.text

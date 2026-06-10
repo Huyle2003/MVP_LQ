@@ -91,6 +91,8 @@ export default function SkinBoardEditor({ backgroundUrl, bgObjectName, items, wi
       quantity: qty,
       x: 100, y: 100,
       width: 90,
+      border_size: 2,
+      border_color: '#ffffff',
       opacity: 1.0,
       z_index: 20 + p.length,
       text: { font_size: 32, font_color: '#ffffff', stroke_color: '#000000', stroke_width: 2, position: 'bottom_right', offset_x: -4, offset_y: -4 },
@@ -172,6 +174,7 @@ export default function SkinBoardEditor({ backgroundUrl, bgObjectName, items, wi
           counted_image_layers: countedLayers.map(ci => ({
             counted_image_id: ci.counted_image_id, object_name: ci.object_name,
             quantity: ci.quantity, x: ci.x, y: ci.y, width: ci.width,
+            border_size: ci.border_size, border_color: ci.border_color,
             opacity: ci.opacity, z_index: ci.z_index,
             text: { font_size: ci.text.font_size, font_color: ci.text.font_color, stroke_color: ci.text.stroke_color, stroke_width: ci.text.stroke_width, position: ci.text.position, offset_x: ci.text.offset_x, offset_y: ci.text.offset_y },
           })),
@@ -237,9 +240,9 @@ export default function SkinBoardEditor({ backgroundUrl, bgObjectName, items, wi
         <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Kéo thả object. Click để chọn. Dùng toolbar để chỉnh.</p>
       </div>
 
-      <div style={{ display: 'flex', minHeight: 400 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: 400 }}>
         {/* Canvas */}
-        <div style={{ flex: 1, maxHeight: '65vh', overflow: 'auto', background: '#1e293b', textAlign: 'center', position: 'relative' }}
+        <div style={{ flex: 1, maxHeight: '55vh', overflow: 'auto', background: '#1e293b', textAlign: 'center', position: 'relative' }}
           onPointerDown={() => { if (!drag) setActive(null) }}>
           <img ref={bgRef} src={backgroundUrl} alt="" style={{ display: 'block', width: '100%', height: 'auto' }}
             onLoad={(e) => { const nw = e.target.naturalWidth, nh = e.target.naturalHeight; setNat({ w: nw, h: nh }); setEx(Math.round(nw * 0.30)); setEy(Math.round(nh * 0.62)); setWrX(Math.round(nw * 0.10)); setWrY(Math.round(nh * 0.75)); setSh(Math.min(800, Math.max(100, Math.round(nh * 0.28)))); setWrH(Math.min(600, Math.max(100, Math.round(nh * 0.20)))); setLoaded(true) }} />
@@ -270,93 +273,85 @@ export default function SkinBoardEditor({ backgroundUrl, bgObjectName, items, wi
           )})}
 
           {/* Counted image layers */}
-          {countedLayers.map(ci => { const isA = 'c-' + ci.id === active; const cw = Math.round(ci.width * ds); return (
-            <div key={ci.id} style={{ position: 'absolute', left: Math.round(ci.x * ds), top: Math.round(ci.y * ds), width: cw, height: 'auto', opacity: ci.opacity, touchAction: 'none', outline: isA ? '2px solid #3b82f6' : 'none', outlineOffset: 2, cursor: drag ? 'grabbing' : 'grab' }}
+          {countedLayers.map(ci => { const isA = 'c-' + ci.id === active; const cw = Math.round(ci.width * ds); const bp = Math.round((ci.border_size + 4) * ds); return (
+            <div key={ci.id} style={{ position: 'absolute', left: Math.round(ci.x * ds), top: Math.round(ci.y * ds), width: cw, padding: bp, background: ci.border_color, borderRadius: Math.round(4 * ds), opacity: ci.opacity, touchAction: 'none', outline: isA ? '2px solid #3b82f6' : 'none', outlineOffset: 2, cursor: drag ? 'grabbing' : 'grab' }}
               onPointerDown={cld(ci)} onPointerMove={clm} onPointerUp={sup} onPointerCancel={sc}>
-              <img src={ci.image_url} alt="" draggable={false} style={{ width: '100%', height: 'auto', display: 'block', pointerEvents: 'none' }} />
-              <span style={{ position: 'absolute', right: ci.text.offset_x, bottom: ci.text.offset_y, color: ci.text.font_color, fontWeight: 800, fontSize: Math.round(ci.text.font_size * ds), textShadow: `-${ci.text.stroke_width}px -${ci.text.stroke_width}px 0 ${ci.text.stroke_color},${ci.text.stroke_width}px -${ci.text.stroke_width}px 0 ${ci.text.stroke_color},-${ci.text.stroke_width}px ${ci.text.stroke_width}px 0 ${ci.text.stroke_color},${ci.text.stroke_width}px ${ci.text.stroke_width}px 0 ${ci.text.stroke_color}`, lineHeight: 1, pointerEvents: 'none' }}>{ci.quantity}</span>
+              <img src={ci.image_url} alt="" draggable={false} style={{ width: '100%', height: 'auto', display: 'block', pointerEvents: 'none', borderRadius: 2 }} />
+              <span style={{ position: 'absolute', right: ci.text.offset_x + 4, bottom: ci.text.offset_y + 4, color: ci.text.font_color, fontWeight: 800, fontSize: Math.round(ci.text.font_size * ds), textShadow: `-${ci.text.stroke_width}px -${ci.text.stroke_width}px 0 ${ci.text.stroke_color},${ci.text.stroke_width}px -${ci.text.stroke_width}px 0 ${ci.text.stroke_color},-${ci.text.stroke_width}px ${ci.text.stroke_width}px 0 ${ci.text.stroke_color},${ci.text.stroke_width}px ${ci.text.stroke_width}px 0 ${ci.text.stroke_color}`, lineHeight: 1, pointerEvents: 'none' }}>{ci.quantity}</span>
               {isA && <button onClick={(e) => { e.stopPropagation(); delCounted(ci.id) }} style={{ position: 'absolute', top: -10, right: -10, width: 22, height: 22, borderRadius: '50%', border: 'none', background: '#ef4444', color: '#fff', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.3)' }}>×</button>}
             </div>
           )})}
         </div>
 
-        {/* Side panel with tabs */}
-        <div style={{ width: 250, borderLeft: '1px solid #e2e8f0', background: '#fafbfc', display: 'flex', flexDirection: 'column' }}>
+        {/* Bottom panel with tabs */}
+        <div style={{ borderTop: '1px solid #e2e8f0', background: '#fafbfc' }}>
           {/* Tabs */}
-          <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#fff' }}>
-            <button style={{ flex: 1, padding: '8px 4px', fontSize: 12, fontWeight: 600, border: 'none', background: sideTab === 'extra' ? '#dbeafe' : 'transparent', color: sideTab === 'extra' ? '#1d4ed8' : '#64748b', cursor: 'pointer' }} onClick={() => setSideTab('extra')}>Ảnh khác</button>
-            <button style={{ flex: 1, padding: '8px 4px', fontSize: 12, fontWeight: 600, border: 'none', background: sideTab === 'counted' ? '#dbeafe' : 'transparent', color: sideTab === 'counted' ? '#1d4ed8' : '#64748b', cursor: 'pointer' }} onClick={() => setSideTab('counted')}>SLượng</button>
+          <div style={{ display: 'flex', background: '#fff' }}>
+            <button style={{ padding: '8px 16px', fontSize: 12, fontWeight: 600, border: 'none', borderBottom: sideTab === 'extra' ? '2px solid #2563eb' : '2px solid transparent', background: 'transparent', color: sideTab === 'extra' ? '#1d4ed8' : '#64748b', cursor: 'pointer' }} onClick={() => setSideTab('extra')}>Ảnh khác</button>
+            <button style={{ padding: '8px 16px', fontSize: 12, fontWeight: 600, border: 'none', borderBottom: sideTab === 'counted' ? '2px solid #2563eb' : '2px solid transparent', background: 'transparent', color: sideTab === 'counted' ? '#1d4ed8' : '#64748b', cursor: 'pointer' }} onClick={() => setSideTab('counted')}>SLượng</button>
           </div>
 
           {sideTab === 'extra' ? (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderBottom: '1px solid #e2e8f0', background: '#fff' }}>
+            <div style={{ display: 'flex', gap: 8, padding: '8px 12px', overflowX: 'auto', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                 <Search size={14} color="#94a3b8" />
-                <input placeholder="Tìm ảnh..." value={catK} onChange={e => setCatK(e.target.value)} onKeyDown={e => e.key === 'Enter' && loadCat()} style={{ flex: 1, border: 'none', outline: 'none', fontSize: 12, padding: '4px 0', background: 'transparent' }} />
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: '#16a34a', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}><ImagePlus size={14} /> Upload<input type="file" accept="image/*" onChange={handleUpload} hidden disabled={upl} /></label>
+                <input placeholder="Tìm ảnh..." value={catK} onChange={e => setCatK(e.target.value)} onKeyDown={e => e.key === 'Enter' && loadCat()} style={{ width: 120, border: '1px solid #d1d5db', borderRadius: 4, padding: '4px 8px', fontSize: 12, outline: 'none' }} />
               </div>
-              <div style={{ flex: 1, overflowY: 'auto', padding: 6 }}>
-                {catL ? <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8' }}><Loader2 className="spin" size={20} /></div>
-                : cat.length === 0 ? <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8' }}>Không có ảnh</div>
-                : cat.map(c => (
-                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 4, cursor: 'pointer', marginBottom: 2 }} onClick={() => addCat(c)}>
-                      <div style={{ width: 32, height: 32, borderRadius: 4, overflow: 'hidden', flexShrink: 0, background: '#e2e8f0' }}><img src={c.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
-                      <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div><div style={{ fontSize: 10, color: '#94a3b8' }}>{c.code}</div></div>
-                      <Plus size={14} style={{ color: '#2563eb', flexShrink: 0 }} />
-                    </div>
-                  ))}
-                {extras.length > 0 && <>
-                  <div style={{ height: 1, background: '#e2e8f0', margin: '4px 12px' }} />
-                  <div style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', padding: '4px 12px', textTransform: 'uppercase' }}>Đã thêm ({extras.length})</div>
-                  {extras.map(im => (
-                    <div key={im.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 4, cursor: 'pointer', marginBottom: 2, background: 'e-' + im.id === active ? '#dbeafe' : 'transparent' }} onClick={() => setActive('e-' + im.id)}>
-                      <div style={{ width: 32, height: 32, borderRadius: 4, overflow: 'hidden', flexShrink: 0, background: '#e2e8f0' }}><img src={im.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
-                      <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{im.name}</div><div style={{ fontSize: 10, color: '#94a3b8' }}>Z:{im.z}</div></div>
-                      <button style={{ width: 22, height: 22, border: 'none', borderRadius: 4, background: 'transparent', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => { e.stopPropagation(); moveZ(im.id, -1) }} title="Lên"><ArrowUp size={12} /></button>
-                      <button style={{ width: 22, height: 22, border: 'none', borderRadius: 4, background: 'transparent', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => { e.stopPropagation(); moveZ(im.id, 1) }} title="Xuống"><ArrowDown size={12} /></button>
-                      <button style={{ width: 22, height: 22, border: 'none', borderRadius: 4, background: '#fee2e2', color: '#dc2626', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => { e.stopPropagation(); delExtra(im.id) }} title="Xoá"><Trash2 size={12} /></button>
-                    </div>
-                  ))}
-                </>}
-              </div>
-            </>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: '#16a34a', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}><ImagePlus size={14} /> Upload<input type="file" accept="image/*" onChange={handleUpload} hidden disabled={upl} /></label>
+              {catL ? <Loader2 className="spin" size={16} /> : null}
+              {!catL && cat.length === 0 && <span style={{ fontSize: 12, color: '#94a3b8', whiteSpace: 'nowrap' }}>Không có ảnh</span>}
+              {cat.map(c => (
+                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, border: '1px solid #e2e8f0', background: 'white' }} onClick={() => addCat(c)}>
+                  <div style={{ width: 28, height: 28, borderRadius: 4, overflow: 'hidden', flexShrink: 0, background: '#e2e8f0' }}><img src={c.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>{c.name}</span>
+                  <Plus size={14} style={{ color: '#2563eb', flexShrink: 0 }} />
+                </div>
+              ))}
+              {extras.length > 0 && <>
+                <div style={{ width: 1, height: 28, background: '#e2e8f0', flexShrink: 0 }} />
+                {extras.map(im => (
+                  <div key={im.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, border: '1px solid #e2e8f0', background: 'e-' + im.id === active ? '#dbeafe' : 'white' }} onClick={() => setActive('e-' + im.id)}>
+                    <div style={{ width: 28, height: 28, borderRadius: 4, overflow: 'hidden', flexShrink: 0, background: '#e2e8f0' }}><img src={im.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                    <span style={{ fontSize: 12, color: '#0f172a' }}>{im.name}</span>
+                    <button style={{ width: 18, height: 18, border: 'none', borderRadius: 4, background: '#fee2e2', color: '#dc2626', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }} onClick={e => { e.stopPropagation(); delExtra(im.id) }} title="Xoá">×</button>
+                  </div>
+                ))}
+              </>}
+            </div>
           ) : (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderBottom: '1px solid #e2e8f0', background: '#fff' }}>
+            <div style={{ display: 'flex', gap: 8, padding: '8px 12px', overflowX: 'auto', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                 <Search size={14} color="#94a3b8" />
-                <input placeholder="Tìm icon..." value={countedCatK} onChange={e => setCountedCatK(e.target.value)} onKeyDown={e => e.key === 'Enter' && loadCountedCat()} style={{ flex: 1, border: 'none', outline: 'none', fontSize: 12, padding: '4px 0', background: 'transparent' }} />
+                <input placeholder="Tìm icon..." value={countedCatK} onChange={e => setCountedCatK(e.target.value)} onKeyDown={e => e.key === 'Enter' && loadCountedCat()} style={{ width: 120, border: '1px solid #d1d5db', borderRadius: 4, padding: '4px 8px', fontSize: 12, outline: 'none' }} />
               </div>
-              <div style={{ flex: 1, overflowY: 'auto', padding: 6 }}>
-                {countedCatL ? <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8' }}><Loader2 className="spin" size={20} /></div>
-                : countedCatalogue.length === 0 ? <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8' }}>Không có ảnh</div>
-                : countedCatalogue.map(c => {
-                    const q = countedQtys[c.id] ?? c.default_quantity ?? 0
-                    return (
-                      <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 4, marginBottom: 2 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 4, overflow: 'hidden', flexShrink: 0, background: '#e2e8f0' }}><img src={c.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <input type="number" min={0} value={q} onChange={e => setCountedQtys(p => ({ ...p, [c.id]: Math.max(0, Number(e.target.value) || 0) }))} style={{ width: 50, height: 24, border: '1px solid #d1d5db', borderRadius: 4, padding: '0 4px', fontSize: 11, textAlign: 'center' }} />
-                            <button style={{ height: 24, padding: '0 8px', borderRadius: 4, border: 'none', background: '#2563eb', color: '#fff', fontSize: 11, cursor: 'pointer', fontWeight: 600 }} onClick={() => { if (q > 0) addCountedLayer(c, q) }}>Thêm</button>
-                          </div>
-                        </div>
+              {countedCatL ? <Loader2 className="spin" size={16} /> : null}
+              {!countedCatL && countedCatalogue.length === 0 && <span style={{ fontSize: 12, color: '#94a3b8', whiteSpace: 'nowrap' }}>Không có ảnh</span>}
+              {countedCatalogue.map(c => {
+                const q = countedQtys[c.id] ?? c.default_quantity ?? 0
+                return (
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, whiteSpace: 'nowrap', flexShrink: 0, border: '1px solid #e2e8f0', background: 'white' }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 4, overflow: 'hidden', flexShrink: 0, background: '#e2e8f0' }}><img src={c.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#0f172a' }}>{c.name}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <input type="number" min={0} value={q} onChange={e => setCountedQtys(p => ({ ...p, [c.id]: Math.max(0, Number(e.target.value) || 0) }))} style={{ width: 46, height: 22, border: '1px solid #d1d5db', borderRadius: 4, padding: '0 4px', fontSize: 11, textAlign: 'center' }} />
+                        <button style={{ height: 22, padding: '0 8px', borderRadius: 4, border: 'none', background: '#2563eb', color: '#fff', fontSize: 11, cursor: 'pointer', fontWeight: 600, lineHeight: 1 }} onClick={() => { if (q > 0) addCountedLayer(c, q) }}>Thêm</button>
                       </div>
-                    )
-                  })}
-                {countedLayers.length > 0 && <>
-                  <div style={{ height: 1, background: '#e2e8f0', margin: '4px 12px' }} />
-                  <div style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', padding: '4px 12px', textTransform: 'uppercase' }}>Đã thêm ({countedLayers.length})</div>
-                  {countedLayers.map(ci => (
-                    <div key={ci.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 4, cursor: 'pointer', marginBottom: 2, background: 'c-' + ci.id === active ? '#dbeafe' : 'transparent' }} onClick={() => setActive('c-' + ci.id)}>
-                      <div style={{ width: 32, height: 32, borderRadius: 4, overflow: 'hidden', flexShrink: 0, background: '#e2e8f0' }}><img src={ci.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
-                      <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ci.name} x{ci.quantity}</div></div>
-                      <button style={{ width: 22, height: 22, border: 'none', borderRadius: 4, background: '#fee2e2', color: '#dc2626', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => { e.stopPropagation(); delCounted(ci.id) }} title="Xoá"><Trash2 size={12} /></button>
                     </div>
-                  ))}
-                </>}
-              </div>
-            </>
+                  </div>
+                )
+              })}
+              {countedLayers.length > 0 && <>
+                <div style={{ width: 1, height: 28, background: '#e2e8f0', flexShrink: 0 }} />
+                {countedLayers.map(ci => (
+                  <div key={ci.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, border: '1px solid #e2e8f0', background: 'c-' + ci.id === active ? '#dbeafe' : 'white' }} onClick={() => setActive('c-' + ci.id)}>
+                    <div style={{ width: 28, height: 28, borderRadius: 4, overflow: 'hidden', flexShrink: 0, background: '#e2e8f0' }}><img src={ci.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                    <span style={{ fontSize: 12, color: '#0f172a' }}>{ci.name} x{ci.quantity}</span>
+                    <button style={{ width: 18, height: 18, border: 'none', borderRadius: 4, background: '#fee2e2', color: '#dc2626', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }} onClick={e => { e.stopPropagation(); delCounted(ci.id) }} title="Xoá">×</button>
+                  </div>
+                ))}
+              </>}
+            </div>
           )}
         </div>
       </div>
@@ -413,8 +408,10 @@ export default function SkinBoardEditor({ backgroundUrl, bgObjectName, items, wi
             <div style={fl(100)}><label style={lb}>Rộng</label><input type="range" min={30} max={300} value={ac.width} onChange={e => updCounted(ac.id, { width: Number(e.target.value) })} style={rg} /><span style={fv}>{ac.width}px</span></div>
             <div style={fl(80)}><label style={lb}>Font</label><input type="number" min={8} max={200} value={ac.text.font_size} onChange={e => updCounted(ac.id, { text: { ...ac.text, font_size: Number(e.target.value) } })} style={nm} /></div>
             <div style={fl(60)}><label style={lb}>Màu</label><input type="color" value={ac.text.font_color} onChange={e => updCounted(ac.id, { text: { ...ac.text, font_color: e.target.value } })} style={{ width: 32, height: 28, padding: 0, border: 'none', cursor: 'pointer' }} /></div>
-            <div style={fl(60)}><label style={lb}>Viền</label><input type="color" value={ac.text.stroke_color} onChange={e => updCounted(ac.id, { text: { ...ac.text, stroke_color: e.target.value } })} style={{ width: 32, height: 28, padding: 0, border: 'none', cursor: 'pointer' }} /></div>
+            <div style={fl(60)}><label style={lb}>Viền chữ</label><input type="color" value={ac.text.stroke_color} onChange={e => updCounted(ac.id, { text: { ...ac.text, stroke_color: e.target.value } })} style={{ width: 32, height: 28, padding: 0, border: 'none', cursor: 'pointer' }} /></div>
             <div style={fl(100)}><label style={lb}>Stroke</label><input type="range" min={0} max={20} value={ac.text.stroke_width} onChange={e => updCounted(ac.id, { text: { ...ac.text, stroke_width: Number(e.target.value) } })} style={rg} /><span style={fv}>{ac.text.stroke_width}px</span></div>
+            <div style={fl(100)}><label style={lb}>Viền ảnh</label><input type="range" min={0} max={20} value={ac.border_size} onChange={e => updCounted(ac.id, { border_size: Number(e.target.value) })} style={rg} /><span style={fv}>{ac.border_size}px</span></div>
+            <div style={fl(60)}><label style={lb}>Màu viền</label><input type="color" value={ac.border_color} onChange={e => updCounted(ac.id, { border_color: e.target.value })} style={{ width: 32, height: 28, padding: 0, border: 'none', cursor: 'pointer' }} /></div>
             <button style={btnD} onClick={() => delCounted(ac.id)}><Trash2 size={16} /> Xoá</button>
           </>
         ) : ae ? (
