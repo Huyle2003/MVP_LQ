@@ -9,9 +9,12 @@ services:
     env_file:
       - .env
     depends_on:
-      - redis
-      - minio
-      - postgres
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+      postgres:
+        condition: service_healthy
     volumes:
       - ./backend:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -83,7 +86,7 @@ services:
     env_file:
       - .env
     volumes:
-      - minio_data:/data
+      - ./data/minio:/data
     command: server /data --console-address ":9001"
     networks:
       - image_mvp_network
@@ -98,13 +101,14 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
     networks:
       - image_mvp_network
-
-volumes:
-  minio_data:
-  postgres_data:
 
 networks:
   image_mvp_network:

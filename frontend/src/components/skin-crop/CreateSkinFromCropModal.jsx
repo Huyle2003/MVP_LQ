@@ -8,6 +8,7 @@ export default function CreateSkinFromCropModal({ open, croppedItem, onClose, on
   const [heroes, setHeroes] = useState([])
   const [heroKeyword, setHeroKeyword] = useState('')
   const [selectedHero, setSelectedHero] = useState(null)
+  const [showDropdown, setShowDropdown] = useState(false)
 
   const [name, setName] = useState('')
   const [skinCode, setSkinCode] = useState('')
@@ -18,45 +19,52 @@ export default function CreateSkinFromCropModal({ open, croppedItem, onClose, on
   const [error, setError] = useState('')
   const [loadingHeroes, setLoadingHeroes] = useState(false)
 
-  // Reset form when modal opens
+  // Load danh sách tướng ngay khi modal mở
   useEffect(() => {
-    if (open) {
-      setHeroKeyword('')
-      setSelectedHero(null)
-      setName('')
-      setSkinCode('')
-      setStatus('ACTIVE')
-      setSortOrder(0)
-      setError('')
-      loadHeroes('')
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+    if (!open || !croppedItem) return
 
-  // Load heroes with keyword
+    setHeroKeyword('')
+    setSelectedHero(null)
+    setShowDropdown(true)
+    setName('')
+    setSkinCode('')
+    setStatus('ACTIVE')
+    setSortOrder(0)
+    setError('')
+
+    loadHeroes('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, croppedItem])
+
   async function loadHeroes(keyword) {
     try {
       setLoadingHeroes(true)
       const data = await getHeroes({ keyword: keyword || undefined })
       setHeroes(data)
     } catch (err) {
-      console.error('Load heroes error:', err)
+      console.error('[Hero load] error:', err)
     } finally {
       setLoadingHeroes(false)
     }
   }
 
-  function handleSearchChange(value) {
+  function handleHeroSearchChange(value) {
     setHeroKeyword(value)
-    const timer = setTimeout(() => {
-      loadHeroes(value)
-    }, 300)
-    return () => clearTimeout(timer)
+    setShowDropdown(true)
+    loadHeroes(value)
   }
 
   function handleSelectHero(hero) {
     setSelectedHero(hero)
     setHeroKeyword('')
+    setShowDropdown(false)
+  }
+
+  function handleClearHero() {
+    setSelectedHero(null)
+    setHeroKeyword('')
+    setShowDropdown(true)
+    loadHeroes('')
   }
 
   async function handleSubmit(e) {
@@ -66,7 +74,6 @@ export default function CreateSkinFromCropModal({ open, croppedItem, onClose, on
       setError('Vui lòng chọn tướng')
       return
     }
-
     if (!name.trim()) {
       setError('Vui lòng nhập tên skin')
       return
@@ -75,16 +82,13 @@ export default function CreateSkinFromCropModal({ open, croppedItem, onClose, on
     try {
       setSaving(true)
       setError('')
-
-      const payload = {
+      await createSkinFromCropped(selectedHero.id, {
         name: name.trim(),
         skin_code: skinCode.trim() || undefined,
         cropped_object_name: croppedItem.object_name,
         status,
         sort_order: sortOrder,
-      }
-
-      await createSkinFromCropped(selectedHero.id, payload)
+      })
       onSaved()
     } catch (err) {
       setError(err.message || 'Có lỗi xảy ra')
@@ -98,12 +102,14 @@ export default function CreateSkinFromCropModal({ open, croppedItem, onClose, on
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box modal-wide" onClick={(e) => e.stopPropagation()}>
+
+        {/* Header */}
         <div className="modal-header">
           <h3>Thêm skin từ ảnh đã cắt</h3>
           <button className="modal-close" onClick={onClose}><X size={20} /></button>
         </div>
 
-        {/* Preview cropped image */}
+        {/* Preview */}
         {croppedItem && (
           <div className="crop-modal-preview">
             <img src={croppedItem.image_url} alt={`Ảnh cắt ${croppedItem.index}`} />
@@ -112,13 +118,16 @@ export default function CreateSkinFromCropModal({ open, croppedItem, onClose, on
 
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
+
             {/* Hero selection */}
             <div className="field">
               <span>Chọn tướng *</span>
+
               {selectedHero ? (
+                // Hero đã được chọn (auto hoặc thủ công)
                 <div className="selected-hero-tag">
                   <span>{selectedHero.name} ({selectedHero.code})</span>
-                  <button type="button" className="tag-remove" onClick={() => setSelectedHero(null)}>
+                  <button type="button" className="tag-remove" onClick={handleClearHero}>
                     <X size={14} />
                   </button>
                 </div>
@@ -129,11 +138,14 @@ export default function CreateSkinFromCropModal({ open, croppedItem, onClose, on
                     type="text"
                     placeholder="Tìm kiếm tướng..."
                     value={heroKeyword}
-                    onChange={(e) => handleSearchChange(e.target.value)}
+                    onChange={(e) => handleHeroSearchChange(e.target.value)}
+                    onFocus={() => { setShowDropdown(true); if (!heroes.length) loadHeroes(heroKeyword) }}
                   />
                 </div>
               )}
-              {!selectedHero && (
+
+              {/* Dropdown list — chỉ hiện khi chưa chọn hero */}
+              {!selectedHero && showDropdown && (
                 <div className="hero-dropdown-list">
                   {loadingHeroes ? (
                     <div className="hero-dropdown-loading">
@@ -157,7 +169,7 @@ export default function CreateSkinFromCropModal({ open, croppedItem, onClose, on
               )}
             </div>
 
-            {/* Skin fields */}
+            {/* Skin name */}
             <div className="field">
               <span>Tên skin *</span>
               <input
@@ -166,6 +178,8 @@ export default function CreateSkinFromCropModal({ open, croppedItem, onClose, on
                 placeholder="Nhập tên skin"
               />
             </div>
+
+            {/* Skin code */}
             <div className="field">
               <span>Mã skin</span>
               <input
@@ -174,6 +188,8 @@ export default function CreateSkinFromCropModal({ open, croppedItem, onClose, on
                 placeholder="Để trống để tự sinh"
               />
             </div>
+
+            {/* Status */}
             <div className="field">
               <span>Trạng thái</span>
               <select value={status} onChange={(e) => setStatus(e.target.value)} className="modal-select">
@@ -181,6 +197,8 @@ export default function CreateSkinFromCropModal({ open, croppedItem, onClose, on
                 <option value="INACTIVE">INACTIVE</option>
               </select>
             </div>
+
+            {/* Sort order */}
             <div className="field">
               <span>Thứ tự hiển thị</span>
               <input
@@ -196,12 +214,17 @@ export default function CreateSkinFromCropModal({ open, croppedItem, onClose, on
 
           <div className="modal-actions">
             <button type="button" className="secondary-button" onClick={onClose}>Huỷ</button>
-            <button type="submit" className="primary-button small" disabled={saving || !selectedHero}>
+            <button
+              type="submit"
+              className="primary-button small"
+              disabled={saving || !selectedHero}
+            >
               {saving ? <Loader2 className="spin" size={18} /> : null}
               Thêm skin
             </button>
           </div>
         </form>
+
       </div>
     </div>
   )

@@ -104,19 +104,14 @@ function FormModal({ open, editItem, onClose, onSaved }) {
             </div>
             <div className="field">
               <span>Ảnh {!editItem ? '*' : ''}</span>
-              <div className="modal-upload-row">
-                <label className="crop-upload-btn">
-                  <Plus size={16} /><span>Chọn ảnh</span>
-                  <input type="file" accept="image/*" onChange={handleImageChange} hidden />
-                </label>
-                {editItem?.image_url && !imageFile && (
-                  <div className="modal-current-img">
-                    <img src={editItem.image_url} alt="current" />
-                  </div>
-                )}
-              </div>
-              {imagePreview && (
-                <div className="modal-preview-img"><img src={imagePreview} alt="preview" /></div>
+              <label className="crop-upload-btn">
+                <Plus size={16} /><span>Chọn ảnh</span>
+                <input type="file" accept="image/*" onChange={handleImageChange} hidden />
+              </label>
+              {(imagePreview || editItem?.image_url) && (
+                <div className="modal-image-preview">
+                  <img src={imagePreview || editItem.image_url} alt="preview" />
+                </div>
               )}
             </div>
             {error && <div className="message error">{error}</div>}
@@ -229,7 +224,7 @@ export default function CountedImagesPage() {
         <div className="skin-grid">
           {items.map(item => (
             <div key={item.id} className="skin-card">
-              <div className="skin-card-img">
+              <div className="skin-card-image">
                 {item.image_url
                   ? <img src={item.image_url} alt={item.name} />
                   : <div className="skin-card-placeholder"><ImageIcon size={32} /></div>

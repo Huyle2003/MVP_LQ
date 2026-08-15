@@ -76,6 +76,19 @@ export async function deleteCroppedSkin(objectName) {
 }
 
 /**
+ * OCR a cropped skin image to detect hero name and skin name.
+ * @param {string} objectName - The object_name of the cropped image
+ * @returns {Promise<{lines: Array<{text: string, confidence: number}>, full_text: string, hero_name: string|null, skin_name: string|null}>}
+ */
+export async function ocrCroppedImage(objectName) {
+  return request('/api/skin-crop/ocr', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ object_name: objectName }),
+  })
+}
+
+/**
  * Create a hero_skin from a cropped image.
  * @param {string} heroId - UUID of the hero
  * @param {object} payload - { name, skin_code?, cropped_object_name, status, sort_order }

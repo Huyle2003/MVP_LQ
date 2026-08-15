@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Crop, ImagePlus, Loader2, Scissors, ScanSearch } from 'lucide-react'
+import { Crop, ImagePlus, Loader2, Scissors, ScanSearch, X } from 'lucide-react'
 
 import { autoDetectCrop, manualCrop, deleteCroppedSkin } from '../services/skinCropService.js'
 import CropConfigPanel, { DEFAULT_AUTO, DEFAULT_MANUAL } from '../components/skin-crop/CropConfigPanel.jsx'
@@ -7,8 +7,7 @@ import CroppedSkinGrid from '../components/skin-crop/CroppedSkinGrid.jsx'
 import CreateSkinFromCropModal from '../components/skin-crop/CreateSkinFromCropModal.jsx'
 
 export default function SkinCropPage() {
-  const [imageFile, setImageFile] = useState(null)
-  const [imagePreview, setImagePreview] = useState('')
+  const [imageFiles, setImageFiles] = useState([])
   const [mode, setMode] = useState('auto')
   const [manualConfig, setManualConfig] = useState({ ...DEFAULT_MANUAL })
   const [autoConfig, setAutoConfig] = useState({ ...DEFAULT_AUTO })
@@ -17,6 +16,7 @@ export default function SkinCropPage() {
   const [selectedCropped, setSelectedCropped] = useState(null)
 
   const [cropping, setCropping] = useState(false)
+  const [cropProgress, setCropProgress] = useState(null)
   const [message, setMessage] = useState('')
   const [imgNatural, setImgNatural] = useState({ w: 0, h: 0 })
   const [detectInfo, setDetectInfo] = useState(null)
@@ -32,11 +32,11 @@ export default function SkinCropPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
 
   const originalPreview = useMemo(() => {
-    if (imageFile) {
-      return URL.createObjectURL(imageFile)
+    if (imageFiles[0]) {
+      return URL.createObjectURL(imageFiles[0])
     }
     return ''
-  }, [imageFile])
+  }, [imageFiles])
 
   function handleImageLoaded(e) {
     const img = e.target
@@ -45,14 +45,9 @@ export default function SkinCropPage() {
     }
   }
 
-  function handleFileChange(e) {
-    const file = e.target.files?.[0] || null
-    setImageFile(file)
-    if (file) {
-      setImagePreview(URL.createObjectURL(file))
-    } else {
-      setImagePreview('')
-    }
+  function handleFilesChange(e) {
+    const files = Array.from(e.target.files || [])
+    setImageFiles(files)
     setCroppedItems([])
     setSelectedCropped(null)
     setMessage('')
@@ -60,70 +55,96 @@ export default function SkinCropPage() {
     setDetectInfo(null)
   }
 
+  function handleRemoveQueuedFile(index) {
+    setImageFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
   async function handleAutoDetect() {
-    if (!imageFile) {
+    if (imageFiles.length === 0) {
       setMessage('Vui lòng chọn ảnh trước khi quét')
       return
     }
 
     try {
       setCropping(true)
-      setMessage('Đang quét và cắt skin...')
+      const allItems = []
+      let totalDetected = 0
+      let lastSize = null
 
-      const formData = new FormData()
-      formData.append('image', imageFile)
-      formData.append('card_width', String(autoConfig.card_width))
-      formData.append('card_height', String(autoConfig.card_height))
-      formData.append('gap_x', String(autoConfig.gap_x))
-      formData.append('row_count', String(autoConfig.row_count))
-      formData.append('count_per_row', String(autoConfig.count_per_row))
-      formData.append('start_x', String(autoConfig.start_x))
+      for (let i = 0; i < imageFiles.length; i++) {
+        setCropProgress({ current: i + 1, total: imageFiles.length })
+        setMessage(`Đang quét và cắt skin... (${i + 1}/${imageFiles.length})`)
 
-      const result = await autoDetectCrop(formData)
-      setCroppedItems(result.items)
+        const formData = new FormData()
+        formData.append('image', imageFiles[i])
+        formData.append('card_width', String(autoConfig.card_width))
+        formData.append('card_height', String(autoConfig.card_height))
+        formData.append('gap_x', String(autoConfig.gap_x))
+        formData.append('row_count', String(autoConfig.row_count))
+        formData.append('count_per_row', String(autoConfig.count_per_row))
+        formData.append('start_x', String(autoConfig.start_x))
+
+        const result = await autoDetectCrop(formData)
+        const offset = allItems.length
+        allItems.push(...result.items.map((it) => ({ ...it, index: offset + it.index })))
+        totalDetected += result.detected_count
+        lastSize = { w: result.image_width, h: result.image_height }
+      }
+
+      setCroppedItems(allItems)
       setSelectedCropped(null)
-      setDetectInfo({ w: result.image_width, h: result.image_height, count: result.detected_count })
+      setDetectInfo(lastSize ? { w: lastSize.w, h: lastSize.h, count: totalDetected } : null)
 
-      if (result.items.length === 0) {
+      if (allItems.length === 0) {
         setMessage('Không tự nhận diện được card skin nào. Vui lòng chuyển sang chế độ "Cắt thủ công".')
       } else {
-        setMessage(`Phát hiện ${result.detected_count} card, cắt thành công ${result.items.length} ảnh skin`)
+        setMessage(`Phát hiện ${totalDetected} card, cắt thành công ${allItems.length} ảnh skin từ ${imageFiles.length} ảnh nguồn`)
       }
     } catch (err) {
       setMessage(err.message || err.detail || 'Có lỗi xảy ra khi quét ảnh')
     } finally {
       setCropping(false)
+      setCropProgress(null)
     }
   }
 
   async function handleManualCrop() {
-    if (!imageFile) {
+    if (imageFiles.length === 0) {
       setMessage('Vui lòng chọn ảnh trước khi cắt')
       return
     }
 
     try {
       setCropping(true)
-      setMessage('Đang cắt thủ công...')
+      const allItems = []
 
-      const formData = new FormData()
-      formData.append('image', imageFile)
-      formData.append('start_x', String(manualConfig.start_x))
-      formData.append('start_y', String(manualConfig.start_y))
-      formData.append('card_width', String(manualConfig.card_width))
-      formData.append('card_height', String(manualConfig.card_height))
-      formData.append('gap_x', String(manualConfig.gap_x))
-      formData.append('row_count', String(manualConfig.row_count))
-      formData.append('count_per_row', String(manualConfig.count_per_row))
+      for (let i = 0; i < imageFiles.length; i++) {
+        setCropProgress({ current: i + 1, total: imageFiles.length })
+        setMessage(`Đang cắt thủ công... (${i + 1}/${imageFiles.length})`)
 
-      const result = await manualCrop(formData)
-      setCroppedItems(result.items)
+        const formData = new FormData()
+        formData.append('image', imageFiles[i])
+        formData.append('start_x', String(manualConfig.start_x))
+        formData.append('start_y', String(manualConfig.start_y))
+        formData.append('card_width', String(manualConfig.card_width))
+        formData.append('card_height', String(manualConfig.card_height))
+        formData.append('gap_x', String(manualConfig.gap_x))
+        formData.append('row_count', String(manualConfig.row_count))
+        formData.append('count_per_row', String(manualConfig.count_per_row))
+
+        const result = await manualCrop(formData)
+        const offset = allItems.length
+        allItems.push(...result.items.map((it) => ({ ...it, index: offset + it.index })))
+      }
+
+      setCroppedItems(allItems)
       setSelectedCropped(null)
-      setMessage(`Cắt thành công ${result.items.length} ảnh skin`)
+      setMessage(`Cắt thành công ${allItems.length} ảnh skin từ ${imageFiles.length} ảnh nguồn`)
     } catch (err) {
       setMessage(err.message || err.detail || 'Có lỗi xảy ra khi cắt ảnh')
     } finally {
       setCropping(false)
+      setCropProgress(null)
     }
   }
 
@@ -155,13 +176,15 @@ export default function SkinCropPage() {
     // Keep the cropped items visible
   }
 
+  const cropButtonLabel = imageFiles.length > 1 ? ` (${imageFiles.length} ảnh)` : ''
+
   return (
     <div className="page-section">
       <div className="page-header">
         <div>
           <h2>Danh mục cắt skin</h2>
           <p>
-            Upload ảnh chụp màn hình cửa hàng skin trong game, cắt nhanh thành từng ảnh skin riêng lẻ.
+            Upload ảnh chụp màn hình cửa hàng skin trong game, cắt nhanh thành từng ảnh skin riêng lẻ. Có thể chọn nhiều ảnh cùng lúc để cắt hàng loạt.
           </p>
         </div>
       </div>
@@ -171,30 +194,49 @@ export default function SkinCropPage() {
         <div className="crop-upload-area">
           <label className="crop-upload-btn">
             <ImagePlus size={18} />
-            <span>Chọn ảnh</span>
-            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileChange} hidden />
+            <span>Chọn ảnh (có thể chọn nhiều)</span>
+            <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleFilesChange} hidden />
           </label>
-          {imageFile && mode === 'auto' && (
+          {imageFiles.length > 0 && mode === 'auto' && (
             <button className="crop-crop-btn" onClick={handleAutoDetect} disabled={cropping}>
               {cropping ? (
                 <Loader2 className="spin" size={18} />
               ) : (
                 <ScanSearch size={18} />
               )}
-              {cropping ? 'Đang quét...' : 'Quét và cắt skin'}
+              {cropping ? `Đang quét... (${cropProgress?.current ?? 0}/${cropProgress?.total ?? imageFiles.length})` : `Quét và cắt skin${cropButtonLabel}`}
             </button>
           )}
-          {imageFile && mode === 'manual' && (
+          {imageFiles.length > 0 && mode === 'manual' && (
             <button className="crop-crop-btn" onClick={handleManualCrop} disabled={cropping}>
               {cropping ? (
                 <Loader2 className="spin" size={18} />
               ) : (
                 <Scissors size={18} />
               )}
-              {cropping ? 'Đang cắt...' : 'Cắt thủ công'}
+              {cropping ? `Đang cắt... (${cropProgress?.current ?? 0}/${cropProgress?.total ?? imageFiles.length})` : `Cắt thủ công${cropButtonLabel}`}
             </button>
           )}
         </div>
+
+        {imageFiles.length > 1 && (
+          <div className="crop-queue-list">
+            {imageFiles.map((file, i) => (
+              <div key={`${file.name}-${i}`} className="crop-queue-item">
+                <span className="crop-queue-item-name" title={file.name}>{i === 0 ? '★ ' : ''}{file.name}</span>
+                <button className="crop-queue-item-remove" onClick={() => handleRemoveQueuedFile(i)} title="Bỏ ảnh này khỏi danh sách" disabled={cropping}>
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {imageFiles.length > 1 && (
+          <div className="crop-img-info">
+            Ảnh đầu tiên (★) dùng để xem trước lưới cắt ở chế độ thủ công. Cấu hình bên dưới sẽ áp dụng cho tất cả {imageFiles.length} ảnh.
+          </div>
+        )}
+
         {detectInfo && (
           <div className="crop-img-info">
             Ảnh: {detectInfo.w}×{detectInfo.h} — Phát hiện {detectInfo.count} card
@@ -214,7 +256,7 @@ export default function SkinCropPage() {
           {/* Original image preview */}
           <div className="crop-preview-box">
             <div className="crop-preview-header">
-              <h4>Ảnh gốc</h4>
+              <h4>Ảnh gốc{imageFiles.length > 1 ? ' (ảnh đầu tiên)' : ''}</h4>
               {imgNatural.w > 0 && (
                 <span className="crop-img-size">{imgNatural.w} × {imgNatural.h}</span>
               )}
