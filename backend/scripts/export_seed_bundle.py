@@ -11,6 +11,9 @@ Run inside the api container (has DB/MinIO network access + deps):
 import json
 import os
 import sys
+from io import BytesIO
+
+from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -23,14 +26,50 @@ MANIFEST_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app", "db", "seed_catalog.json"
 )
 
+# The mobile app embeds every one of these assets as base64 inside its JS
+# bundle, so raw PNGs (~250KB each for artwork this size) would balloon the
+# APK past what the device can even load. Artwork without transparency
+# re-encodes to JPEG ~8x smaller with no visible difference; anything WITH an
+# alpha channel (buttons, kill-notification cutouts) stays PNG, since JPEG
+# would flatten its transparency to black.
+JPEG_QUALITY = 85
+
 
 def _ext(object_name: str) -> str:
     ext = os.path.splitext(object_name)[1]
     return ext if ext else ".png"
 
 
+def _has_alpha(image: Image.Image) -> bool:
+    return image.mode in ("RGBA", "LA", "PA") or "transparency" in image.info
+
+
+def _compress(content: bytes, relative_path: str) -> tuple[bytes, str]:
+    """Return (bytes, relative_path) — possibly re-encoded to JPEG with the
+    path's extension swapped to match."""
+    try:
+        image = Image.open(BytesIO(content))
+        image.load()
+    except Exception:
+        return content, relative_path  # not decodable as an image — pass through
+
+    if _has_alpha(image):
+        buf = BytesIO()
+        image.save(buf, "PNG", optimize=True)
+        compressed = buf.getvalue()
+        return (compressed if len(compressed) < len(content) else content), relative_path
+
+    buf = BytesIO()
+    image.convert("RGB").save(buf, "JPEG", quality=JPEG_QUALITY, optimize=True, progressive=True)
+    compressed = buf.getvalue()
+    if len(compressed) >= len(content):
+        return content, relative_path
+    return compressed, os.path.splitext(relative_path)[0] + ".jpg"
+
+
 def _save_asset(storage: StorageRepository, object_name: str, relative_path: str) -> str:
     content = storage.read_bytes(object_name)
+    content, relative_path = _compress(content, relative_path)
     full_path = os.path.join(ASSETS_DIR, relative_path)
     os.makedirs(os.path.dirname(full_path), exist_ok=True)
     with open(full_path, "wb") as f:
@@ -42,6 +81,7 @@ def main():
     db = SessionLocal()
     storage = StorageRepository()
     manifest = {
+        "heroes": [],
         "hero_skins": [],
         "skin_buttons": [],
         "skin_kill_notifications": [],
@@ -49,7 +89,17 @@ def main():
         "counted_images": [],
     }
 
-    heroes_by_id = {h.id: h for h in db.query(Hero).all()}
+    # Heroes are exported too (name+code, no image) so consumers can restore
+    # the exact hero list rather than relying on a separately-maintained
+    # hardcoded list that silently drifts as heroes are added.
+    heroes = db.query(Hero).order_by(Hero.name).all()
+    heroes_by_id = {h.id: h for h in heroes}
+    for hero in heroes:
+        manifest["heroes"].append({
+            "name": hero.name,
+            "code": hero.code,
+            "status": hero.status,
+        })
 
     skins = db.query(HeroSkin).all()
     skins_by_id = {}

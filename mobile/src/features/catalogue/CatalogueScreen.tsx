@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { ListFilter, Status } from '../../db/types';
 import { ImagePrefix, absoluteUri } from '../../storage/fileStorage';
@@ -78,6 +80,15 @@ export default function CatalogueScreen<T extends CatalogueFormItem & { id: stri
     return () => clearTimeout(t);
   }, [load, reloadKey]);
 
+  // Re-fetch every time this screen gains focus (e.g. navigating back from a
+  // detail screen after adding/editing something there) so lists never show
+  // stale data without the user having to manually pull-to-refresh.
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
   function openCreate() {
     setEditing(null);
     setModalVisible(true);
@@ -114,12 +125,15 @@ export default function CatalogueScreen<T extends CatalogueFormItem & { id: stri
   return (
     <View style={styles.container}>
       <View style={styles.filterBar}>
-        <TextInput
-          style={styles.search}
-          placeholder="Tìm kiếm..."
-          value={keyword}
-          onChangeText={setKeyword}
-        />
+        <View style={styles.searchRow}>
+          <Ionicons name="search-outline" size={16} color="#94a3b8" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Tìm kiếm..."
+            value={keyword}
+            onChangeText={setKeyword}
+          />
+        </View>
         <View style={styles.statusChips}>
           {(['ACTIVE', 'INACTIVE'] as Status[]).map((s) => (
             <Pressable
@@ -143,7 +157,11 @@ export default function CatalogueScreen<T extends CatalogueFormItem & { id: stri
         onRefresh={load}
         ListEmptyComponent={<Text style={styles.emptyText}>{emptyText}</Text>}
         renderItem={({ item }) => (
-          <Pressable style={styles.row} onPress={() => (onPressItem ? onPressItem(item) : openEdit(item))}>
+          <Pressable
+            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+            android_ripple={{ color: '#e2e8f0' }}
+            onPress={() => (onPressItem ? onPressItem(item) : openEdit(item))}
+          >
             {hasImage && item.image_path && (
               <Image source={{ uri: absoluteUri(item.image_path) }} style={styles.thumb} />
             )}
@@ -156,18 +174,23 @@ export default function CatalogueScreen<T extends CatalogueFormItem & { id: stri
             </View>
             <View style={styles.rowActions}>
               <Pressable style={styles.rowActionBtn} onPress={() => openEdit(item)}>
-                <Text style={styles.rowActionText}>Sửa</Text>
+                <Ionicons name="pencil-outline" size={16} color="#2563eb" />
               </Pressable>
               <Pressable style={styles.rowActionBtn} onPress={() => handleDelete(item)}>
-                <Text style={[styles.rowActionText, styles.rowActionDanger]}>Xoá</Text>
+                <Ionicons name="trash-outline" size={16} color="#dc2626" />
               </Pressable>
             </View>
           </Pressable>
         )}
       />
 
-      <Pressable style={styles.fab} onPress={openCreate}>
-        <Text style={styles.fabText}>+ Thêm</Text>
+      <Pressable
+        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+        android_ripple={{ color: '#1d4ed8' }}
+        onPress={openCreate}
+      >
+        <Ionicons name="add" size={18} color="#fff" />
+        <Text style={styles.fabText}>Thêm</Text>
       </Pressable>
 
       <CatalogueFormModal
@@ -188,7 +211,16 @@ export default function CatalogueScreen<T extends CatalogueFormItem & { id: stri
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   filterBar: { padding: 12, gap: 8, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-  search: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14 },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+  },
+  searchInput: { flex: 1, paddingVertical: 8, fontSize: 14 },
   statusChips: { flexDirection: 'row', gap: 8 },
   chip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: '#f1f5f9' },
   chipActive: { backgroundColor: '#dbeafe' },
@@ -205,18 +237,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
+  rowPressed: { backgroundColor: '#f8fafc' },
   thumb: { width: 44, height: 44, borderRadius: 6, backgroundColor: '#e2e8f0' },
   rowInfo: { flex: 1 },
   rowName: { fontSize: 15, fontWeight: '600', color: '#0f172a' },
   rowMeta: { fontSize: 12, color: '#64748b', marginTop: 2 },
   rowActions: { flexDirection: 'row', gap: 6 },
   rowActionBtn: { paddingHorizontal: 8, paddingVertical: 6 },
-  rowActionText: { fontSize: 13, color: '#2563eb', fontWeight: '600' },
-  rowActionDanger: { color: '#dc2626' },
   fab: {
     position: 'absolute',
     right: 16,
     bottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: '#2563eb',
     borderRadius: 999,
     paddingHorizontal: 18,
@@ -227,5 +261,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
   },
+  fabPressed: { backgroundColor: '#1d4ed8' },
   fabText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });

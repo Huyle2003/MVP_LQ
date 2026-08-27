@@ -21,6 +21,16 @@ class SkinButtonUpdate(BaseModel):
     sort_order: Optional[int] = Field(None, ge=0)
 
 
+class CreateButtonFromCroppedRequest(BaseModel):
+    """Request to create a skin_button from an already-cropped image in MinIO."""
+    skin_id: UUID
+    name: str = Field(..., min_length=1, max_length=255)
+    code: Optional[str] = Field(None, max_length=255)
+    cropped_object_name: str = Field(..., min_length=1)
+    status: str = Field("ACTIVE", pattern="^(ACTIVE|INACTIVE)$")
+    sort_order: int = Field(0, ge=0)
+
+
 class SkinButtonResponse(BaseModel):
     id: UUID
     skin_id: UUID

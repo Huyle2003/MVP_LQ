@@ -12,6 +12,7 @@ from app.repositories.skin_button_repository import SkinButtonRepository
 from app.repositories.storage_repository import StorageRepository
 from app.schemas.skin_button_schema import (
     SkinButtonCreate, SkinButtonUpdate, SkinButtonResponse,
+    CreateButtonFromCroppedRequest,
 )
 from app.utils.slug import to_slug
 
@@ -89,6 +90,36 @@ class SkinButtonService:
         content, ext, ct = _validate_and_read(image)
         object_name = f"skin-buttons/{hero_code}/{skin_code}/{code}-{uuid.uuid4()}{ext}"
         self.storage.save_bytes_to_path(content, object_name, ct)
+
+        btn = SkinButton(id=uuid.uuid4(), skin_id=payload.skin_id, name=payload.name.strip(),
+                         code=code, image_object_name=object_name, status=payload.status,
+                         sort_order=payload.sort_order)
+        btn = self.repo.create(btn)
+        return self._enrich(btn)
+
+    def create_from_cropped(self, payload: CreateButtonFromCroppedRequest) -> SkinButtonResponse:
+        skin = self.hero_skin_repo.get_by_id(payload.skin_id)
+        if not skin:
+            raise HTTPException(status_code=404, detail="Không tìm thấy skin")
+        hero = self.hero_repo.get_by_id(skin.hero_id)
+        hero_code = hero.code if hero else "unknown"
+        skin_code = skin.skin_code
+
+        code = payload.code or to_slug(payload.name)
+        if not code:
+            raise HTTPException(status_code=400, detail="Không thể sinh code từ tên")
+        if self.repo.get_by_code(payload.skin_id, code):
+            raise HTTPException(status_code=409, detail=f"Code '{code}' đã tồn tại trong skin này")
+
+        if not self.storage.object_exists(payload.cropped_object_name):
+            raise HTTPException(status_code=400, detail="Ảnh đã cắt không tồn tại trên MinIO")
+
+        import os as _os
+        _, ext = _os.path.splitext(payload.cropped_object_name)
+        if not ext:
+            ext = ".png"
+        object_name = f"skin-buttons/{hero_code}/{skin_code}/{code}-{uuid.uuid4()}{ext}"
+        self.storage.copy_object(source_object=payload.cropped_object_name, target_object=object_name)
 
         btn = SkinButton(id=uuid.uuid4(), skin_id=payload.skin_id, name=payload.name.strip(),
                          code=code, image_object_name=object_name, status=payload.status,

@@ -1,12 +1,18 @@
 import { Trash2, CheckCircle, Maximize2 } from 'lucide-react'
 import { useState } from 'react'
 
-export default function CroppedSkinGrid({ items, selectedIndex, onSelect, onDelete }) {
+export default function CroppedSkinGrid({
+  items,
+  selectedIndex,
+  onSelect,
+  onDelete,
+  emptyMessage = 'Chưa có ảnh nào được cắt. Hãy upload và bấm "Quét và cắt skin".',
+}) {
   const [previewUrl, setPreviewUrl] = useState(null)
   if (!items || items.length === 0) {
     return (
       <div className="empty-state small">
-        <p>Chưa có ảnh nào được cắt. Hãy upload và bấm "Quét và cắt skin".</p>
+        <p>{emptyMessage}</p>
       </div>
     )
   }

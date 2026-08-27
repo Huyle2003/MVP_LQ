@@ -45,3 +45,11 @@ export async function deleteSkinKillNotification(id) {
 export async function getSkinKillNotificationDetail(id) {
   return request(`/api/skin-kill-notifications/${id}`)
 }
+
+export async function createSkinKillNotificationFromCropped(payload) {
+  return request('/api/skin-kill-notifications/from-cropped', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}

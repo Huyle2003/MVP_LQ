@@ -7,6 +7,8 @@ import ComposerPage from './pages/ComposerPage.jsx'
 import UsersPage from './pages/UsersPage.jsx'
 import SkinCategoryPage from './pages/SkinCategoryPage.jsx'
 import SkinCropPage from './pages/SkinCropPage.jsx'
+import KillNotificationCropPage from './pages/KillNotificationCropPage.jsx'
+import ButtonCropPage from './pages/ButtonCropPage.jsx'
 import ButtonCategoryPage from './pages/ButtonCategoryPage.jsx'
 import NotificationTemplatePage from './pages/NotificationTemplatePage.jsx'
 import OtherImagesPage from './pages/OtherImagesPage.jsx'
@@ -77,6 +79,10 @@ export default function App() {
         return <ComposerPage />
       case 'skin-crop':
         return <SkinCropPage />
+      case 'kill-notification-crop':
+        return <KillNotificationCropPage />
+      case 'button-crop':
+        return <ButtonCropPage />
       case 'skin-categories':
         return <SkinCategoryPage />
       case 'button-categories':

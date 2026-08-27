@@ -40,7 +40,8 @@
           "photosPermission": "Ứng dụng cần quyền truy cập thư viện ảnh để lưu ảnh đã ghép.",
           "savePhotosPermission": "Ứng dụng cần quyền lưu ảnh đã ghép vào thư viện ảnh."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {

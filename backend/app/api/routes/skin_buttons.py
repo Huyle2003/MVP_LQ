@@ -8,6 +8,7 @@ from app.core.security import get_current_user
 from app.db.database import get_db
 from app.schemas.skin_button_schema import (
     SkinButtonCreate, SkinButtonUpdate, SkinButtonResponse,
+    CreateButtonFromCroppedRequest,
 )
 from app.services.skin_button_service import SkinButtonService
 
@@ -51,6 +52,16 @@ async def create_button(
     payload = SkinButtonCreate(skin_id=skin_id, name=name, code=code, status=status, sort_order=sort_order)
     service = SkinButtonService(db)
     return await service.create(payload, image)
+
+
+@router.post("/from-cropped", response_model=SkinButtonResponse, status_code=201)
+def create_button_from_cropped(
+    payload: CreateButtonFromCroppedRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    service = SkinButtonService(db)
+    return service.create_from_cropped(payload)
 
 
 @router.put("/{button_id}", response_model=SkinButtonResponse)

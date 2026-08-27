@@ -34,16 +34,64 @@ function resolveCode(name: string, explicitCode?: string | null): string {
   return trimmed && trimmed.length > 0 ? trimmed : toSlug(name);
 }
 
+/** Turns raw SQLite constraint errors (e.g. "UNIQUE constraint failed:
+ * hero_skins.hero_id, hero_skins.skin_code", wrapped in a native
+ * "NativeStatement.finalizeAsync has been rejected" message) into a plain
+ * Vietnamese message the catalogue/crop forms can show directly. */
+function translateDbError(err: unknown): Error {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg.includes('UNIQUE constraint failed')) {
+    if (msg.includes('hero_skins.')) {
+      return new Error('Tên hoặc mã skin này đã tồn tại cho tướng đã chọn. Vui lòng đổi tên hoặc nhập mã skin khác.');
+    }
+    if (msg.includes('skin_buttons.')) {
+      return new Error('Tên hoặc mã nút bấm này đã tồn tại cho skin đã chọn. Vui lòng đổi tên hoặc nhập mã khác.');
+    }
+    if (msg.includes('skin_kill_notifications.')) {
+      return new Error('Tên hoặc mã thông báo hạ này đã tồn tại cho skin đã chọn. Vui lòng đổi tên hoặc nhập mã khác.');
+    }
+    if (msg.includes('heroes.name')) {
+      return new Error('Tên tướng này đã tồn tại. Vui lòng đổi tên khác.');
+    }
+    if (msg.includes('heroes.code')) {
+      return new Error('Mã tướng này đã tồn tại. Vui lòng đổi tên hoặc nhập mã khác.');
+    }
+    if (msg.includes('other_images.code')) {
+      return new Error('Tên hoặc mã ảnh này đã tồn tại. Vui lòng đổi tên hoặc nhập mã khác.');
+    }
+    if (msg.includes('counted_images.code')) {
+      return new Error('Tên hoặc mã ảnh số lượng này đã tồn tại. Vui lòng đổi tên hoặc nhập mã khác.');
+    }
+    return new Error('Tên hoặc mã này đã tồn tại, vui lòng đổi giá trị khác.');
+  }
+  return err instanceof Error ? err : new Error(String(err));
+}
+
+/** INSERT/UPDATE wrapper — DELETE and SELECT calls can't hit a UNIQUE
+ * constraint so they keep using db.runAsync/getAllAsync directly. */
+async function runWriteAsync(
+  db: SQLite.SQLiteDatabase,
+  sql: string,
+  params: (string | number)[]
+): Promise<void> {
+  try {
+    await db.runAsync(sql, params);
+  } catch (err) {
+    throw translateDbError(err);
+  }
+}
+
 async function listWhere<T>(
   db: SQLite.SQLiteDatabase,
   table: string,
   clauses: string[],
   params: (string | number)[],
-  columns = '*'
+  columns = '*',
+  orderBy = 'sort_order ASC, created_at ASC'
 ): Promise<T[]> {
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
   return db.getAllAsync<T>(
-    `SELECT ${columns} FROM ${table} ${where} ORDER BY sort_order ASC, created_at ASC`,
+    `SELECT ${columns} FROM ${table} ${where} ORDER BY ${orderBy}`,
     params
   );
 }
@@ -80,7 +128,7 @@ export const heroRepo = {
   async list(filter?: ListFilter) {
     const db = await getDb();
     const { clauses, params } = filterClauses(filter);
-    return listWhere<import('./types').Hero>(db, 'heroes', clauses, params);
+    return listWhere<import('./types').Hero>(db, 'heroes', clauses, params, '*', 'name ASC');
   },
   async get(id: string) {
     const db = await getDb();
@@ -91,7 +139,8 @@ export const heroRepo = {
     const id = newId();
     const ts = nowIso();
     const code = resolveCode(input.name, input.code);
-    await db.runAsync(
+    await runWriteAsync(
+      db,
       `INSERT INTO heroes (id, name, code, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
       [id, input.name.trim(), code, input.status ?? 'ACTIVE', ts, ts]
     );
@@ -104,7 +153,8 @@ export const heroRepo = {
     const name = patch.name?.trim() ?? current.name;
     const code = patch.code !== undefined ? resolveCode(name, patch.code) : current.code;
     const status = patch.status ?? current.status;
-    await db.runAsync(
+    await runWriteAsync(
+      db,
       `UPDATE heroes SET name = ?, code = ?, status = ?, updated_at = ? WHERE id = ?`,
       [name, code, status, nowIso(), id]
     );
@@ -144,7 +194,8 @@ export const heroSkinRepo = {
     const id = newId();
     const ts = nowIso();
     const skinCode = resolveCode(input.name, input.code);
-    await db.runAsync(
+    await runWriteAsync(
+      db,
       `INSERT INTO hero_skins (id, hero_id, name, skin_code, image_path, status, sort_order, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, heroId, input.name.trim(), skinCode, input.image_path, input.status ?? 'ACTIVE', input.sort_order ?? 0, ts, ts]
@@ -157,7 +208,8 @@ export const heroSkinRepo = {
     if (!current) throw new Error('Không tìm thấy skin');
     const name = patch.name?.trim() ?? current.name;
     const skinCode = patch.code !== undefined ? resolveCode(name, patch.code) : current.code;
-    await db.runAsync(
+    await runWriteAsync(
+      db,
       `UPDATE hero_skins SET name = ?, skin_code = ?, image_path = ?, status = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
       [
         name,
@@ -208,7 +260,8 @@ function createSkinScopedRepo(table: 'skin_buttons' | 'skin_kill_notifications')
       const id = newId();
       const ts = nowIso();
       const code = resolveCode(input.name, input.code);
-      await db.runAsync(
+      await runWriteAsync(
+        db,
         `INSERT INTO ${table} (id, skin_id, name, code, image_path, status, sort_order, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [id, skinId, input.name.trim(), code, input.image_path, input.status ?? 'ACTIVE', input.sort_order ?? 0, ts, ts]
@@ -224,7 +277,8 @@ function createSkinScopedRepo(table: 'skin_buttons' | 'skin_kill_notifications')
       if (!current) throw new Error('Không tìm thấy mục');
       const name = patch.name?.trim() ?? current.name;
       const code = patch.code !== undefined ? resolveCode(name, patch.code) : current.code;
-      await db.runAsync(
+      await runWriteAsync(
+        db,
         `UPDATE ${table} SET name = ?, code = ?, image_path = ?, status = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
         [
           name,
@@ -308,7 +362,7 @@ function createStandaloneCatalogueRepo<
             ts,
           ]
         : [id, input.name.trim(), code, input.image_path, input.status ?? 'ACTIVE', input.sort_order ?? 0, ts, ts];
-      await db.runAsync(`INSERT INTO ${table} (${columns}) VALUES (${placeholders})`, values);
+      await runWriteAsync(db, `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`, values);
       return id;
     },
     async update(id: string, patch: Partial<StandaloneCatalogueInput>) {
@@ -339,7 +393,7 @@ function createStandaloneCatalogueRepo<
             nowIso(),
           ];
       values.push(id);
-      await db.runAsync(`UPDATE ${table} SET ${setSql} WHERE id = ?`, values);
+      await runWriteAsync(db, `UPDATE ${table} SET ${setSql} WHERE id = ?`, values);
     },
     async remove(id: string) {
       const db = await getDb();

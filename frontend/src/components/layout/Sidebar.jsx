@@ -3,12 +3,14 @@ import {
   Bell,
   CopyPlus,
   Crop,
+  Eraser,
   Home,
   Image,
   Images,
   ListOrdered,
   Menu,
   MousePointerClick,
+  Scissors,
   Users,
   X,
 } from 'lucide-react'
@@ -48,6 +50,16 @@ const menuItems = [
     key: 'notification-categories',
     label: 'Danh mục thông báo hạ',
     icon: Bell,
+  },
+  {
+    key: 'kill-notification-crop',
+    label: 'Cắt thông báo hạ',
+    icon: Eraser,
+  },
+  {
+    key: 'button-crop',
+    label: 'Cắt nút bấm',
+    icon: Scissors,
   },
   {
     key: 'other-images',

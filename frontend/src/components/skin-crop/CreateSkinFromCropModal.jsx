@@ -3,6 +3,7 @@ import { Loader2, Search, X } from 'lucide-react'
 
 import { getHeroes } from '../../services/heroService.js'
 import { createSkinFromCropped } from '../../services/skinCropService.js'
+import { capitalizeWords } from '../../utils/text.js'
 
 export default function CreateSkinFromCropModal({ open, croppedItem, onClose, onSaved }) {
   const [heroes, setHeroes] = useState([])
@@ -174,7 +175,7 @@ export default function CreateSkinFromCropModal({ open, croppedItem, onClose, on
               <span>Tên skin *</span>
               <input
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => setName(capitalizeWords(e.target.value))}
                 placeholder="Nhập tên skin"
               />
             </div>

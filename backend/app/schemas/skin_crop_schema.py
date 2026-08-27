@@ -39,6 +39,16 @@ class ManualCropConfig(BaseModel):
     gap_x: int = Field(12, ge=0)
     row_count: int = Field(1, ge=1, le=10)
     count_per_row: int = Field(5, ge=1, le=20)
+    # Both off by default (skin crop keeps its exact fixed-stride behavior).
+    # refine_x: each column's left edge is nudged within refine_window px of
+    # its fixed-stride position to the strongest nearby left-edge signal —
+    # compensates for real card spacing not being perfectly uniform, which
+    # otherwise makes later columns drift further off with every column.
+    # refine_y: same idea for each row's top edge, so a Start Y that's off
+    # by 10-20px still crops correctly.
+    refine_x: bool = Field(False)
+    refine_y: bool = Field(False)
+    refine_window: int = Field(24, ge=0, le=400)
 
 
 class CropItemResponse(BaseModel):
@@ -66,3 +76,16 @@ class CreateSkinFromCroppedRequest(BaseModel):
     cropped_object_name: str = Field(..., min_length=1)
     status: str = Field("ACTIVE", pattern="^(ACTIVE|INACTIVE)$")
     sort_order: int = Field(0, ge=0)
+
+
+# ─── Background removal ───────────────────────────────────
+class RemoveBackgroundRequest(BaseModel):
+    """Request to remove the background from a cropped image already in MinIO."""
+    object_name: str = Field(..., min_length=1)
+    tolerance: int = Field(24, ge=1, le=100)
+
+
+class RemoveBackgroundResponse(BaseModel):
+    """A new object with its background made transparent."""
+    object_name: str
+    image_url: str

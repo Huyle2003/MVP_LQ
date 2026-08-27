@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
-import { absoluteUri, deleteImage, saveBytes } from '../../storage/fileStorage';
+import { absoluteUri, deleteImage, importImage, saveBytes } from '../../storage/fileStorage';
 import {
   computeManualGridBoxes,
   cropToPngBytes,
@@ -55,6 +55,16 @@ export default function CropScreen() {
     [config, nat]
   );
 
+  function handleResetPage() {
+    setSourceUri(null);
+    setNat({ w: 0, h: 0 });
+    setContainerWidth(0);
+    setConfig({ ...DEFAULT_MANUAL_CROP });
+    setTiles([]);
+    setSelectedTile(null);
+    setMessage('');
+  }
+
   async function handlePickImage() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
@@ -68,11 +78,40 @@ export default function CropScreen() {
     setTiles([]);
     setSelectedTile(null);
     setMessage('');
-    if (asset.width && asset.height) {
-      setNat({ w: asset.width, h: asset.height });
-    } else {
-      Image.getSize(asset.uri, (w, h) => setNat({ w, h }));
+    setNat({ w: 0, h: 0 });
+    // Always measure via Image.getSize — the same native decoder the
+    // <Image> preview below uses to render — rather than trusting
+    // asset.width/height from the picker, which can disagree with the
+    // rendered size (e.g. EXIF-rotated photos) and throw the grid overlay
+    // off from the actual card positions.
+    Image.getSize(
+      asset.uri,
+      (w, h) => setNat({ w, h }),
+      () => {
+        if (asset.width && asset.height) setNat({ w: asset.width, h: asset.height });
+      }
+    );
+  }
+
+  async function handleAddExistingCrop() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Cần quyền truy cập', 'Ứng dụng cần quyền truy cập thư viện ảnh.');
+      return;
     }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 1,
+      allowsMultipleSelection: true,
+    });
+    if (result.canceled || !result.assets?.length) return;
+    const added: CroppedTile[] = [];
+    for (const asset of result.assets) {
+      const path = await importImage(asset.uri, 'crop-sources');
+      added.push({ id: `${Date.now()}-${added.length}-${Math.random()}`, path });
+    }
+    setTiles((prev) => [...prev, ...added]);
+    setMessage(`Đã thêm ${added.length} ảnh có sẵn`);
   }
 
   function updateField(key: keyof ManualCropConfig, text: string) {
@@ -123,6 +162,16 @@ export default function CropScreen() {
         <Pressable style={styles.pickButton} onPress={handlePickImage}>
           <Text style={styles.pickButtonText}>{sourceUri ? 'Chọn ảnh khác' : 'Chọn ảnh nguồn'}</Text>
         </Pressable>
+
+        <Pressable style={styles.secondaryButton} onPress={handleAddExistingCrop}>
+          <Text style={styles.secondaryButtonText}>+ Thêm ảnh đã cắt sẵn (nếu cắt tự động bị lỗi)</Text>
+        </Pressable>
+
+        {(sourceUri || tiles.length > 0) && (
+          <Pressable style={styles.resetButton} onPress={handleResetPage}>
+            <Text style={styles.resetButtonText}>Làm mới trang</Text>
+          </Pressable>
+        )}
 
         {sourceUri && (
           <View style={styles.previewWrap} onLayout={onContainerLayout}>
@@ -221,6 +270,10 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 16, paddingBottom: 100 },
   pickButton: { backgroundColor: '#2563eb', borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
   pickButtonText: { color: '#fff', fontWeight: '700' },
+  secondaryButton: { backgroundColor: '#f1f5f9', borderRadius: 8, paddingVertical: 10, alignItems: 'center', marginTop: 8 },
+  secondaryButtonText: { color: '#334155', fontWeight: '600', fontSize: 12 },
+  resetButton: { backgroundColor: '#fef2f2', borderRadius: 8, paddingVertical: 10, alignItems: 'center', marginTop: 8, borderWidth: 1, borderColor: '#fecaca' },
+  resetButtonText: { color: '#b91c1c', fontWeight: '600', fontSize: 12 },
   previewWrap: { marginTop: 12, backgroundColor: '#0f172a', borderRadius: 8, overflow: 'hidden' },
   gridBox: { position: 'absolute', borderWidth: 2, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.15)' },
   configGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },

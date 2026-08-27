@@ -125,8 +125,8 @@ export default function CatalogueFormModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <Text style={styles.title}>{title}</Text>
           <ScrollView keyboardShouldPersistTaps="handled">
             {hasImage && (
@@ -197,8 +197,8 @@ export default function CatalogueFormModal({
               <Text style={styles.buttonPrimaryText}>{saving ? 'Đang lưu...' : 'Lưu'}</Text>
             </Pressable>
           </View>
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }

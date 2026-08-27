@@ -52,8 +52,25 @@ export function saveBytes(bytes: Uint8Array, prefix: ImagePrefix, ext = 'png'): 
   return `${prefix}/${filename}`;
 }
 
+/** Write a base64-encoded image (e.g. from a bundled seed data file) into local storage. */
+export function saveBase64(base64: string, prefix: ImagePrefix, ext = 'png'): string {
+  const dir = ensureDir(prefix);
+  const filename = `${Crypto.randomUUID()}.${ext}`;
+  const file = new File(dir, filename);
+  file.write(base64, { encoding: 'base64' });
+  return `${prefix}/${filename}`;
+}
+
 /** Delete a previously stored image; safe to call if it's already gone. */
 export function deleteImage(relativePath: string): void {
   const file = new File(Paths.document, relativePath);
   if (file.exists) file.delete();
+}
+
+/** Delete every file under a prefix. Used when a stale seeded catalog is
+ * being replaced wholesale — the DB rows pointing at these files are cleared
+ * in the same pass, so leaving the files behind would just waste disk. */
+export function clearPrefix(prefix: ImagePrefix): void {
+  const dir = new Directory(Paths.document, prefix);
+  if (dir.exists) dir.delete();
 }

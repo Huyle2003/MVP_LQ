@@ -45,3 +45,11 @@ export async function deleteSkinButton(id) {
 export async function getSkinButtonDetail(id) {
   return request(`/api/skin-buttons/${id}`)
 }
+
+export async function createSkinButtonFromCropped(payload) {
+  return request('/api/skin-buttons/from-cropped', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}

@@ -8,6 +8,7 @@ from app.core.security import get_current_user
 from app.db.database import get_db
 from app.schemas.skin_kill_notification_schema import (
     SkinKillNotificationCreate, SkinKillNotificationUpdate, SkinKillNotificationResponse,
+    CreateKillNotificationFromCroppedRequest,
 )
 from app.services.skin_kill_notification_service import SkinKillNotificationService
 
@@ -51,6 +52,16 @@ async def create_notification(
     payload = SkinKillNotificationCreate(skin_id=skin_id, name=name, code=code, status=status, sort_order=sort_order)
     service = SkinKillNotificationService(db)
     return await service.create(payload, image)
+
+
+@router.post("/from-cropped", response_model=SkinKillNotificationResponse, status_code=201)
+def create_notification_from_cropped(
+    payload: CreateKillNotificationFromCroppedRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    service = SkinKillNotificationService(db)
+    return service.create_from_cropped(payload)
 
 
 @router.put("/{ntf_id}", response_model=SkinKillNotificationResponse)

@@ -21,6 +21,17 @@ class SkinKillNotificationUpdate(BaseModel):
     sort_order: Optional[int] = Field(None, ge=0)
 
 
+class CreateKillNotificationFromCroppedRequest(BaseModel):
+    """Request to create a skin_kill_notification from a cropped (and
+    optionally background-removed) image already sitting in MinIO."""
+    skin_id: UUID
+    name: str = Field(..., min_length=1, max_length=255)
+    code: Optional[str] = Field(None, max_length=255)
+    cropped_object_name: str = Field(..., min_length=1)
+    status: str = Field("ACTIVE", pattern="^(ACTIVE|INACTIVE)$")
+    sort_order: int = Field(0, ge=0)
+
+
 class SkinKillNotificationResponse(BaseModel):
     id: UUID
     skin_id: UUID

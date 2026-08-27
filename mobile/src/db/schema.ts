@@ -8,6 +8,15 @@ export const SCHEMA_SQL = `
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 
+-- Small key/value table for app-level bookkeeping. Currently holds the seed
+-- bundle version, so an app updated with a NEW bundled catalog can tell that
+-- its local copy is stale and needs replacing rather than merging (seeding is
+-- otherwise insert-only and would leave removed/renamed entries behind).
+CREATE TABLE IF NOT EXISTS app_meta (
+  key TEXT PRIMARY KEY NOT NULL,
+  value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS heroes (
   id TEXT PRIMARY KEY NOT NULL,
   name TEXT NOT NULL UNIQUE,

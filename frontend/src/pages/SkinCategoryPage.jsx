@@ -20,6 +20,7 @@ import {
   updateHeroSkin,
   deleteHeroSkin,
 } from '../services/heroService.js'
+import { capitalizeWords } from '../utils/text.js'
 
 /* ─────────────────────────────────────────── */
 /*  Confirm dialog                             */
@@ -213,7 +214,7 @@ function SkinModal({ open, hero, skin, onClose, onSave }) {
           <div className="modal-body">
             <div className="field">
               <span>Tên skin *</span>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nhập tên skin" />
+              <input value={name} onChange={(e) => setName(capitalizeWords(e.target.value))} placeholder="Nhập tên skin" />
             </div>
             <div className="field">
               <span>Mã skin</span>
@@ -448,7 +449,7 @@ export default function SkinCategoryPage() {
         {/* ─── Left column: Heroes ──────────────── */}
         <div className="skin-left">
           <div className="skin-left-header">
-            <h3>Danh mục tướng</h3>
+            <h3>Danh mục tướng ({heroes.length})</h3>
             <button className="secondary-button" onClick={handleAddHero}>
               <Plus size={16} /> Thêm tướng
             </button>
@@ -519,7 +520,7 @@ export default function SkinCategoryPage() {
           ) : (
             <>
               <div className="skin-right-header">
-                <h3>Skin của {selectedHero.name}</h3>
+                <h3>Skin của {selectedHero.name} ({skins.length})</h3>
                 <button className="secondary-button" onClick={handleAddSkin}>
                   <ImagePlus size={16} /> Thêm skin
                 </button>

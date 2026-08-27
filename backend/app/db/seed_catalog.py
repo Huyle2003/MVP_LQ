@@ -25,6 +25,18 @@ def _ext(relative_asset_path: str) -> str:
     return ext if ext else ".png"
 
 
+def _content_type(relative_asset_path: str) -> str:
+    """Assets are exported as JPEG where possible (PNG only when they carry
+    transparency), so the stored content type has to follow the extension
+    rather than being hardcoded."""
+    ext = _ext(relative_asset_path).lower()
+    if ext in (".jpg", ".jpeg"):
+        return "image/jpeg"
+    if ext == ".webp":
+        return "image/webp"
+    return "image/png"
+
+
 def _read_asset(relative_path: str) -> bytes | None:
     full_path = ASSETS_DIR / relative_path
     if not full_path.exists():
@@ -42,10 +54,24 @@ def seed_catalog_from_bundle() -> None:
 
     db = SessionLocal()
     storage = StorageRepository()
-    counts = {"hero_skins": 0, "skin_buttons": 0, "skin_kill_notifications": 0, "other_images": 0, "counted_images": 0}
+    counts = {"heroes": 0, "hero_skins": 0, "skin_buttons": 0, "skin_kill_notifications": 0, "other_images": 0, "counted_images": 0}
 
     try:
         heroes_by_code = {h.code: h for h in db.query(Hero).all()}
+
+        # ── Heroes ────────────────────────────────────
+        # Seeded from the manifest so the exported hero list stays the single
+        # source of truth (the hardcoded LIEN_QUAN_HEROES list only covers
+        # the original roster and goes stale as heroes are added).
+        for entry in manifest.get("heroes", []):
+            if entry["code"] in heroes_by_code:
+                continue
+            hero = Hero(name=entry["name"], code=entry["code"], status=entry.get("status", "ACTIVE"))
+            db.add(hero)
+            heroes_by_code[entry["code"]] = hero
+            counts["heroes"] += 1
+        if counts["heroes"]:
+            db.commit()
 
         # ── Hero skins ────────────────────────────────
         for entry in manifest.get("hero_skins", []):
@@ -63,7 +89,7 @@ def seed_catalog_from_bundle() -> None:
             if content is None:
                 continue
             object_name = f"skins/{hero.code}/{entry['skin_code']}-{uuid.uuid4()}{_ext(entry['asset'])}"
-            storage.save_bytes_to_path(content=content, object_name=object_name, content_type="image/png")
+            storage.save_bytes_to_path(content=content, object_name=object_name, content_type=_content_type(entry["asset"]))
             db.add(HeroSkin(
                 hero_id=hero.id,
                 name=entry["name"],
@@ -106,7 +132,7 @@ def seed_catalog_from_bundle() -> None:
                 f"skin-buttons/{entry['hero_code']}/{entry['skin_code']}/"
                 f"{entry['code']}-{uuid.uuid4()}{_ext(entry['asset'])}"
             )
-            storage.save_bytes_to_path(content=content, object_name=object_name, content_type="image/png")
+            storage.save_bytes_to_path(content=content, object_name=object_name, content_type=_content_type(entry["asset"]))
             db.add(SkinButton(
                 skin_id=skin.id,
                 name=entry["name"],
@@ -138,7 +164,7 @@ def seed_catalog_from_bundle() -> None:
                 f"skin-kill-notifications/{entry['hero_code']}/{entry['skin_code']}/"
                 f"{entry['code']}-{uuid.uuid4()}{_ext(entry['asset'])}"
             )
-            storage.save_bytes_to_path(content=content, object_name=object_name, content_type="image/png")
+            storage.save_bytes_to_path(content=content, object_name=object_name, content_type=_content_type(entry["asset"]))
             db.add(SkinKillNotification(
                 skin_id=skin.id,
                 name=entry["name"],
@@ -160,7 +186,7 @@ def seed_catalog_from_bundle() -> None:
             if content is None:
                 continue
             object_name = f"other-images/{entry['code']}-{uuid.uuid4().hex[:8]}{_ext(entry['asset'])}"
-            storage.save_bytes_to_path(content=content, object_name=object_name, content_type="image/png")
+            storage.save_bytes_to_path(content=content, object_name=object_name, content_type=_content_type(entry["asset"]))
             db.add(OtherImage(
                 name=entry["name"],
                 code=entry["code"],
@@ -182,7 +208,7 @@ def seed_catalog_from_bundle() -> None:
             if content is None:
                 continue
             object_name = f"counted-images/{entry['code']}-{uuid.uuid4().hex[:8]}{_ext(entry['asset'])}"
-            storage.save_bytes_to_path(content=content, object_name=object_name, content_type="image/png")
+            storage.save_bytes_to_path(content=content, object_name=object_name, content_type=_content_type(entry["asset"]))
             db.add(CountedImage(
                 name=entry["name"],
                 code=entry["code"],

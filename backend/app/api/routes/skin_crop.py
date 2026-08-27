@@ -12,6 +12,8 @@ from app.schemas.skin_crop_schema import (
     ManualCropConfig,
     DeleteCropRequest,
     CreateSkinFromCroppedRequest,
+    RemoveBackgroundRequest,
+    RemoveBackgroundResponse,
 )
 from app.schemas.hero_skin_schema import HeroSkinResponse
 from app.services.skin_crop_service import SkinCropService
@@ -43,6 +45,42 @@ async def auto_detect_and_crop(
     )
 
 
+@router.post("/auto-detect-notifications", response_model=AutoDetectResponse)
+async def auto_detect_notifications(
+    image: UploadFile = File(...),
+    card_width: int = Form(325),
+    card_height: int = Form(515),
+    gap_x: int = Form(25),
+    row_count: int = Form(1),
+    count_per_row: int = Form(5),
+    start_x: int = Form(702),
+    current_user: dict = Depends(get_current_user),
+):
+    """Auto-detect kill notification banners: same fixed-X/AI-scored-Y
+    detector as skin cards, Y search bounded to the middle half of the image."""
+    service = SkinCropService()
+    return await service.auto_detect_notifications(
+        file=image,
+        card_width=card_width,
+        card_height=card_height,
+        gap_x=gap_x,
+        row_count=row_count,
+        count_per_row=count_per_row,
+        start_x=start_x,
+    )
+
+
+@router.post("/auto-detect-buttons", response_model=AutoDetectResponse)
+async def auto_detect_buttons(
+    image: UploadFile = File(...),
+    count_per_row: int = Form(4),
+    current_user: dict = Depends(get_current_user),
+):
+    """Auto-detect skin button icons from the hero card grid."""
+    service = SkinCropService()
+    return await service.auto_detect_buttons(file=image, count_per_row=count_per_row)
+
+
 @router.post("/manual-crop", response_model=CropResponse)
 async def manual_crop(
     image: UploadFile = File(...),
@@ -53,6 +91,9 @@ async def manual_crop(
     gap_x: int = Form(12),
     row_count: int = Form(1),
     count_per_row: int = Form(5),
+    refine_x: bool = Form(False),
+    refine_y: bool = Form(False),
+    refine_window: int = Form(24),
     current_user: dict = Depends(get_current_user),
 ):
     """Manual grid-based cropping (fallback)."""
@@ -64,9 +105,22 @@ async def manual_crop(
         gap_x=gap_x,
         row_count=row_count,
         count_per_row=count_per_row,
+        refine_x=refine_x,
+        refine_y=refine_y,
+        refine_window=refine_window,
     )
     service = SkinCropService()
     return await service.manual_crop_image(file=image, config=config)
+
+
+@router.post("/remove-background", response_model=RemoveBackgroundResponse)
+def remove_background(
+    payload: RemoveBackgroundRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Remove the background from an already-cropped image sitting in MinIO."""
+    service = SkinCropService()
+    return service.remove_background(payload.object_name, payload.tolerance)
 
 
 @router.delete("/items", status_code=204)

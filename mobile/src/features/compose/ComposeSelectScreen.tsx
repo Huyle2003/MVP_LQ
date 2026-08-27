@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 
 import { heroRepo, heroSkinRepo, skinButtonRepo, skinKillNotificationRepo } from '../../db/db';
 import { Hero, HeroSkin } from '../../db/types';
@@ -24,12 +25,22 @@ export default function ComposeSelectScreen() {
   const [winRateItems, setWinRateItems] = useState<WinRateItem[]>([]);
   const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    const t = setTimeout(async () => {
-      setHeroes(await heroRepo.list({ keyword: heroKeyword || undefined, status: 'ACTIVE' }));
-    }, 250);
-    return () => clearTimeout(t);
+  const loadHeroes = useCallback(async () => {
+    setHeroes(await heroRepo.list({ keyword: heroKeyword || undefined, status: 'ACTIVE' }));
   }, [heroKeyword]);
+
+  useEffect(() => {
+    const t = setTimeout(loadHeroes, 250);
+    return () => clearTimeout(t);
+  }, [loadHeroes]);
+
+  // Re-fetch on every focus so a hero added from another tab shows up
+  // without needing to leave and re-enter the Compose tab.
+  useFocusEffect(
+    useCallback(() => {
+      loadHeroes();
+    }, [loadHeroes])
+  );
 
   async function handleSelectHero(hero: Hero) {
     setSelectedHero(hero);
@@ -79,6 +90,16 @@ export default function ComposeSelectScreen() {
     setSelectedItems((prev) => prev.filter((it) => it.skinId !== skinId));
   }
 
+  function moveItem(index: number, dir: -1 | 1) {
+    setSelectedItems((prev) => {
+      const t = index + dir;
+      if (t < 0 || t >= prev.length) return prev;
+      const arr = [...prev];
+      [arr[index], arr[t]] = [arr[t], arr[index]];
+      return arr;
+    });
+  }
+
   async function handlePickWinRate() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return;
@@ -96,6 +117,26 @@ export default function ComposeSelectScreen() {
     setWinRateItems((prev) => prev.filter((i) => i.id !== id));
   }
 
+  function moveWinRate(index: number, dir: -1 | 1) {
+    setWinRateItems((prev) => {
+      const t = index + dir;
+      if (t < 0 || t >= prev.length) return prev;
+      const arr = [...prev];
+      [arr[index], arr[t]] = [arr[t], arr[index]];
+      return arr;
+    });
+  }
+
+  function handleResetPage() {
+    setBgPath(null);
+    setHeroKeyword('');
+    setSelectedHero(null);
+    setSkins([]);
+    setSelectedItems([]);
+    setWinRateItems([]);
+    setMessage('');
+  }
+
   function handleCreateLayout() {
     if (!bgPath) {
       setMessage('Chọn ảnh nền trước');
@@ -110,6 +151,12 @@ export default function ComposeSelectScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
+      {(bgPath || selectedHero || selectedItems.length > 0 || winRateItems.length > 0) && (
+        <Pressable style={styles.resetButton} onPress={handleResetPage}>
+          <Text style={styles.resetButtonText}>Làm mới trang</Text>
+        </Pressable>
+      )}
+
       <Text style={styles.sectionTitle}>1. Ảnh nền</Text>
       <Pressable style={styles.pickButton} onPress={handlePickBackground}>
         <Text style={styles.pickButtonText}>{bgPath ? 'Chọn ảnh nền khác' : 'Chọn ảnh nền'}</Text>
@@ -136,10 +183,13 @@ export default function ComposeSelectScreen() {
       />
       {selectedHero && (
         <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
           data={skins}
           keyExtractor={(s) => s.id}
-          numColumns={3}
-          columnWrapperStyle={styles.skinRow}
+          style={styles.skinList}
+          contentContainerStyle={styles.skinListContent}
+          ListEmptyComponent={<Text style={styles.emptyHint}>Tướng này chưa có skin nào.</Text>}
           renderItem={({ item }) => {
             const added = selectedItems.some((s) => s.skinId === item.id);
             return (
@@ -154,8 +204,9 @@ export default function ComposeSelectScreen() {
       )}
 
       <Text style={styles.sectionTitle}>3. Skin đã chọn ({selectedItems.length})</Text>
-      {selectedItems.map((item) => (
+      {selectedItems.map((item, idx) => (
         <View key={item.skinId} style={styles.selectedRow}>
+          <Text style={styles.orderBadge}>{idx + 1}</Text>
           <Image source={{ uri: absoluteUri(item.imagePath) }} style={styles.selectedImage} />
           <View style={styles.selectedInfo}>
             <Text style={styles.selectedName}>{item.heroName} - {item.skinName}</Text>
@@ -175,9 +226,25 @@ export default function ComposeSelectScreen() {
               </View>
             )}
           </View>
-          <Pressable onPress={() => removeItem(item.skinId)}>
-            <Text style={styles.removeText}>Xoá</Text>
-          </Pressable>
+          <View style={styles.orderActions}>
+            <Pressable
+              style={[styles.orderBtn, idx === 0 && styles.orderBtnDisabled]}
+              disabled={idx === 0}
+              onPress={() => moveItem(idx, -1)}
+            >
+              <Ionicons name="arrow-up" size={16} color={idx === 0 ? '#cbd5e1' : '#334155'} />
+            </Pressable>
+            <Pressable
+              style={[styles.orderBtn, idx === selectedItems.length - 1 && styles.orderBtnDisabled]}
+              disabled={idx === selectedItems.length - 1}
+              onPress={() => moveItem(idx, 1)}
+            >
+              <Ionicons name="arrow-down" size={16} color={idx === selectedItems.length - 1 ? '#cbd5e1' : '#334155'} />
+            </Pressable>
+            <Pressable onPress={() => removeItem(item.skinId)}>
+              <Text style={styles.removeText}>Xoá</Text>
+            </Pressable>
+          </View>
         </View>
       ))}
 
@@ -185,13 +252,30 @@ export default function ComposeSelectScreen() {
       <Pressable style={styles.pickButton} onPress={handlePickWinRate}>
         <Text style={styles.pickButtonText}>Thêm ảnh tỷ lệ thắng</Text>
       </Pressable>
-      {winRateItems.map((item) => (
+      {winRateItems.map((item, idx) => (
         <View key={item.id} style={styles.selectedRow}>
+          <Text style={styles.orderBadge}>{idx + 1}</Text>
           <Image source={{ uri: absoluteUri(item.imagePath) }} style={styles.selectedImage} />
           <Text style={styles.selectedInfo}>{item.fileName}</Text>
-          <Pressable onPress={() => removeWinRate(item.id)}>
-            <Text style={styles.removeText}>Xoá</Text>
-          </Pressable>
+          <View style={styles.orderActions}>
+            <Pressable
+              style={[styles.orderBtn, idx === 0 && styles.orderBtnDisabled]}
+              disabled={idx === 0}
+              onPress={() => moveWinRate(idx, -1)}
+            >
+              <Ionicons name="arrow-up" size={16} color={idx === 0 ? '#cbd5e1' : '#334155'} />
+            </Pressable>
+            <Pressable
+              style={[styles.orderBtn, idx === winRateItems.length - 1 && styles.orderBtnDisabled]}
+              disabled={idx === winRateItems.length - 1}
+              onPress={() => moveWinRate(idx, 1)}
+            >
+              <Ionicons name="arrow-down" size={16} color={idx === winRateItems.length - 1 ? '#cbd5e1' : '#334155'} />
+            </Pressable>
+            <Pressable onPress={() => removeWinRate(item.id)}>
+              <Text style={styles.removeText}>Xoá</Text>
+            </Pressable>
+          </View>
         </View>
       ))}
 
@@ -205,6 +289,8 @@ export default function ComposeSelectScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 40 },
+  resetButton: { backgroundColor: '#fef2f2', borderRadius: 8, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: '#fecaca' },
+  resetButtonText: { color: '#b91c1c', fontWeight: '600', fontSize: 12 },
   sectionTitle: { fontSize: 14, fontWeight: '700', marginTop: 18, marginBottom: 8, color: '#0f172a' },
   pickButton: { backgroundColor: '#2563eb', borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
   pickButtonText: { color: '#fff', fontWeight: '700' },
@@ -215,8 +301,10 @@ const styles = StyleSheet.create({
   heroChipActive: { backgroundColor: '#dbeafe' },
   heroChipText: { fontSize: 13, color: '#64748b', fontWeight: '600' },
   heroChipTextActive: { color: '#1d4ed8' },
-  skinRow: { gap: 8, marginBottom: 8 },
-  skinCard: { flex: 1, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 6, alignItems: 'center' },
+  skinList: { marginTop: 4 },
+  skinListContent: { gap: 8, paddingVertical: 4 },
+  emptyHint: { fontSize: 12, color: '#94a3b8', paddingVertical: 8 },
+  skinCard: { width: 84, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 6, alignItems: 'center' },
   skinCardAdded: { borderColor: '#2563eb', backgroundColor: '#eff6ff' },
   skinCardImage: { width: '100%', aspectRatio: 0.75, borderRadius: 6, backgroundColor: '#e2e8f0' },
   skinCardName: { fontSize: 11, marginTop: 4, color: '#0f172a' },
@@ -228,6 +316,13 @@ const styles = StyleSheet.create({
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   checkLabel: { fontSize: 12, color: '#334155' },
   removeText: { color: '#dc2626', fontWeight: '600', fontSize: 13 },
+  orderBadge: {
+    width: 20, height: 20, borderRadius: 10, backgroundColor: '#eff6ff', color: '#1d4ed8',
+    fontSize: 11, fontWeight: '700', textAlign: 'center', textAlignVertical: 'center', overflow: 'hidden',
+  },
+  orderActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  orderBtn: { width: 28, height: 28, borderRadius: 6, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  orderBtnDisabled: { backgroundColor: '#f8fafc' },
   message: { marginTop: 12, color: '#dc2626', fontSize: 13 },
   primaryButton: { backgroundColor: '#16a34a', borderRadius: 8, paddingVertical: 14, alignItems: 'center', marginTop: 18 },
   primaryButtonText: { color: '#fff', fontWeight: '700', fontSize: 15 },

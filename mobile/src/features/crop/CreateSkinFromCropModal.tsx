@@ -71,8 +71,8 @@ export default function CreateSkinFromCropModal({ visible, imagePath, onClose, o
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <Text style={styles.title}>Thêm skin vào tướng</Text>
 
           {imagePath && <Image source={{ uri: absoluteUri(imagePath) }} style={styles.preview} />}
@@ -129,8 +129,8 @@ export default function CreateSkinFromCropModal({ visible, imagePath, onClose, o
               <Text style={styles.buttonPrimaryText}>{saving ? 'Đang lưu...' : 'Lưu'}</Text>
             </Pressable>
           </View>
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
