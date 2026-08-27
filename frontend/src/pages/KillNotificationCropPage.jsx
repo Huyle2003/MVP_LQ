@@ -19,7 +19,7 @@ const BG_REMOVAL_ENABLED = false
 // Auto mode derives all geometry from the screenshot, so it only needs the
 // column count. Manual mode keeps the measured grid values as a fallback.
 const NOTIF_DEFAULT_AUTO = { count_per_row: 4 }
-const NOTIF_DEFAULT_MANUAL = { ...DEFAULT_MANUAL, start_x: 765, start_y: 686, gap_x: 55, card_width: 378, card_height: 108, count_per_row: 4, refine_window: 120 }
+const NOTIF_DEFAULT_MANUAL = { ...DEFAULT_MANUAL, start_x: 765, start_y: 686, gap_x: 55, card_width: 378, card_height: 118, count_per_row: 4, refine_window: 120 }
 
 export default function KillNotificationCropPage() {
   const [imageFiles, setImageFiles] = useState([])

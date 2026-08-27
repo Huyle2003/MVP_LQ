@@ -4,7 +4,7 @@ The banner is a fixed-size element at a fixed offset inside a hero card:
 
     card row top ──┬─ +0     card artwork starts
                    ├─ +375   banner top      ← what we crop
-                   ├─ +483   banner bottom
+                   ├─ +493   banner bottom
                    └─ +687   next card row top
 
 so all that has to be found is one card row's top edge — see tasks/card_grid.py,
@@ -27,7 +27,12 @@ import numpy as np
 from app.tasks.card_grid import CardGrid
 
 BANNER_OFFSET = 375      # card row top -> banner top
-BANNER_HEIGHT = 108
+# The bar itself ends around +105, but the fancier banners have decoration
+# (flames, glow, wings) hanging below it that a 108px box clipped. The card's
+# own content runs to ~118-130 past the banner top before the page background
+# starts, so 118 takes in that overhang while staying inside the card. Kept a
+# fixed height rather than trimming per banner so a row of them lines up.
+BANNER_HEIGHT = 118
 DEFAULT_COLUMNS = 4
 
 
